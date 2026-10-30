@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TerrainRoute Stage 2</title>
+<style>
+  :root { --bg: #f6f5f2; --fg: #1f1d1a; --muted: #6b665e; --line: #d9d5cc; --accent: #c4561b; --bad: #b3261e; --ok: #2e7d32; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #171614; --fg: #ece9e4; --muted: #a39d93; --line: #3a3732; --accent: #e07a3f; --bad: #f2867c; --ok: #81c784; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.45 -apple-system, system-ui, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 20px; margin: 0 0 4px; } h2 { font-size: 16px; margin: 24px 0 8px; }
+  p.note { color: var(--muted); font-size: 14px; margin: 0 0 12px; }
+  label { display: block; font-size: 14px; color: var(--muted); margin: 8px 0 4px; }
+  input, select, button { font: inherit; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--fg); width: 100%; }
+  button { background: var(--accent); color: #fff; border: 0; margin-top: 10px; min-height: 44px; }
+  button.secondary { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+  button:disabled { opacity: .5; }
+  .row { display: flex; gap: 8px; } .row > * { flex: 1; }
+  .msg { margin-top: 8px; font-size: 14px; white-space: pre-wrap; } .msg.bad { color: var(--bad); } .msg.ok { color: var(--ok); }
+  .area { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 8px 0; font-size: 14px; }
+  .area b { font-size: 15px; } .area button { width: auto; margin: 6px 6px 0 0; padding: 6px 10px; min-height: 36px; font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; font-variant-numeric: tabular-nums; }
+  td, th { border-bottom: 1px solid var(--line); padding: 6px 4px; text-align: right; } td:first-child, th:first-child { text-align: left; }
+</style>
+</head>
+<body>
+<main>
+  <h1>TerrainRoute: Stage 2 check</h1>
+  <p class="note">Prepares an area in this browser, stores it on this device, and times routing. Not the final design.</p>
+
+  <h2>1. Prepare an area</h2>
+  <label for="center">Centre (lat, lon)</label>
+  <div class="row"><input id="center" placeholder="40.00, -107.40" inputmode="decimal" autocomplete="off"><button id="here" class="secondary" style="flex:0 0 auto;width:auto;margin-top:0">Use my location</button></div>
+  <label for="radius">Size</label>
+  <select id="radius"><option value="4">8 × 8 km (full size)</option><option value="2">4 × 4 km</option><option value="1">2 × 2 km</option></select>
+  <button id="prep">Prepare area</button>
+  <div id="prepMsg" class="msg"></div>
+
+  <h2>2. Areas on this device</h2>
+  <div id="areas"><p class="note">Loading…</p></div>
+  <div id="storage" class="msg"></div>
+
+  <h2>3. Route timing</h2>
+  <p class="note">Five random point pairs inside the area, normal mode. Times include the first-route setup.</p>
+  <select id="routeArea"></select>
+  <button id="time">Time 5 routes</button>
+  <div id="timeMsg" class="msg"></div>
+  <table id="timeTable" hidden><thead><tr><th>Pair</th><th>Straight m</th><th>Hybrid m</th><th>Effort km</th><th>ms</th></tr></thead><tbody></tbody></table>
+
+  <h2>4. Results</h2>
+  <p class="note">Timings and sizes only: no coordinates or area names.</p>
+  <button id="copy" class="secondary">Copy results</button>
+  <div id="copyMsg" class="msg"></div>
+</main>
+<script type="module" src="prepare.js"></script>
+</body>
+</html>
