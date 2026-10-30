@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F5E54">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="TerrainRoute">
+<title>TerrainRoute</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="stylesheet" href="vendor/maplibre/maplibre-gl.css">
+<link rel="stylesheet" href="app.css">
+<script src="vendor/maplibre/maplibre-gl.js"></script>
+</head>
+<body>
+<div id="map" aria-label="Map"></div>
+
+<form id="search" class="floating search" autocomplete="off">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+  <label class="sr" for="searchInput">Go to coordinates</label>
+  <input id="searchInput" placeholder="Paste lat, lon" inputmode="decimal" enterkeyhint="go">
+</form>
+
+<div class="mapbtns top">
+  <button id="btnLayers" class="floating icon" aria-label="Map layers" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l9 5-9 5-9-5 9-5z"></path><path d="M3 13l9 5 9-5"></path></svg></button>
+  <button id="btn3d" class="floating icon text" aria-pressed="false">3D</button>
+  <button id="btnNorth" class="floating icon" aria-label="Reset to north up"><svg viewBox="0 0 24 24" aria-hidden="true" class="filled"><path d="M12 3l4 9h-8z" fill="#C2410C"></path><path d="M12 21l-4-9h8z" fill="#9AA3AD"></path></svg></button>
+</div>
+<div class="mapbtns bottom">
+  <button id="btnZoomIn" class="floating icon wide-only" aria-label="Zoom in">+</button>
+  <button id="btnZoomOut" class="floating icon wide-only" aria-label="Zoom out">−</button>
+  <button id="btnLocate" class="floating icon" aria-label="Show my location"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path></svg></button>
+</div>
+
+<section id="layers" class="layers" hidden aria-label="Map layers">
+  <div class="sheethead"><h2>Map layers</h2><button id="layersClose" class="close" aria-label="Close layers">×</button></div>
+  <div class="label">Base map</div>
+  <div class="bases" role="group" aria-label="Base map">
+    <button data-base="topo"><span class="sw topo"></span>Topo</button>
+    <button data-base="imagery"><span class="sw imagery"></span>Imagery</button>
+    <button data-base="both"><span class="sw both"></span>Both</button>
+  </div>
+  <p class="hint">USGS maps. Saved for offline use with each area; outside your areas they need a connection.</p>
+  <div class="label">Overlays</div>
+  <label class="row">Slope angle<input type="checkbox" id="ovSteep"></label>
+  <div class="slopebar" aria-hidden="true"><span style="background:#F7E463"></span><span style="background:#F2A23A"></span><span style="background:#D9471F"></span><span style="background:#6B21A8"></span></div>
+  <div class="slopelab" aria-hidden="true"><span>27–29°</span><span>30–34°</span><span>35–44°</span><span>45°+</span></div>
+  <label class="row small">Opacity<input type="range" id="steepOpacity" min="10" max="100" value="60"></label>
+  <label class="row line">Trails<input type="checkbox" id="ovTrails"></label>
+  <label class="row line">Route difficulty colours<input type="checkbox" id="ovShade"></label>
+  <label class="row line">Kept routes<input type="checkbox" id="ovKept"></label>
+</section>
+
+<aside id="panel" class="panel" data-sheet="peek">
+  <button id="grabber" class="grabber" aria-label="Resize panel"><span></span></button>
+  <header class="brand">
+    <span class="logo"><svg viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="7" fill="#0F5E54"></rect><path d="M6 20 L11 11 L15 16 L18 12 L22 20" fill="none" stroke="#fff" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"></path></svg>TerrainRoute</span>
+    <button id="areaChip" class="chip"><span class="dot"></span><span id="areaChipText">No area yet</span></button>
+  </header>
+
+  <nav id="tabs" class="tabs" aria-label="Main">
+    <button data-tab="route"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"></path><path d="M9 4v14M15 6v14"></path></svg><span>Route</span></button>
+    <button data-tab="saved"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"></path></svg><span>Saved</span></button>
+    <button data-tab="areas"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"></rect><path d="M12 8v7M9 12l3 3 3-3"></path></svg><span>Areas</span></button>
+    <button data-tab="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg><span>Settings</span></button>
+  </nav>
+
+  <section id="tab-route" class="tab">
+    <p id="routeEmpty" class="empty"></p>
+    <div id="routeBody" class="routebody">
+      <div class="summary">
+        <div class="titlerow"><h2 id="routeTitle">Start → End</h2><span id="routeState" class="state"></span></div>
+        <div class="stats">
+          <div><b id="sDist">–</b><span id="sDistU">mi</span></div>
+          <div><b id="sUp">–</b><span id="sUpU">ft up</span></div>
+          <div><b id="sDown">–</b><span id="sDownU">ft down</span></div>
+          <div><b id="sEffort" class="accent">–</b><span id="sEffortU">effort mi</span></div>
+        </div>
+        <div id="strip" class="strip" aria-hidden="true"></div>
+      </div>
+      <div class="actions">
+        <button id="btnGpx" class="primary">Share GPX</button>
+        <button id="btnKeep" class="secondary">Keep</button>
+      </div>
+      <div class="points">
+        <div class="pt"><span class="pin a">A</span><div><input id="nameA" aria-label="Start name" placeholder="Start" maxlength="40"><div id="coordA" class="coord">Tap the map to set</div></div><button id="locA" class="mini" aria-label="Use my location as start"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l18-8-8 18-2-8z"></path></svg></button></div>
+        <div class="pt"><span class="pin b">B</span><div><input id="nameB" aria-label="End name" placeholder="End" maxlength="40"><div id="coordB" class="coord">Tap the map to set</div></div><button id="swap" class="mini" aria-label="Swap start and end"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M3 8l4-4 4 4M17 20V4M21 16l-4 4-4-4"></path></svg></button></div>
+      </div>
+      <div class="moderow">
+        <div class="seg" role="group" aria-label="Mode"><button data-mode="normal">Normal</button><button data-mode="packout">Pack-out</button></div>
+        <label class="fric">Off-trail<select id="friction"></select></label>
+      </div>
+      <p id="modeHint" class="hint"></p>
+      <div class="card profile">
+        <div class="readout"><span>Elevation</span><b id="profileReadout"></b></div>
+        <svg id="profile" viewBox="0 0 320 100" role="img" aria-label="Elevation profile"></svg>
+        <div class="pstats"><div>Start<b id="pStart">–</b></div><div>End<b id="pEnd">–</b></div><div>High<b id="pHigh">–</b></div><div>Low<b id="pLow">–</b></div></div>
+      </div>
+      <dl class="details">
+        <div><dt>On trail</dt><dd id="dTrail">–</dd></div>
+        <div><dt>Off trail</dt><dd id="dOff">–</dd></div>
+        <div><dt>Hardest 200 m</dt><dd id="dHard">–</dd></div>
+      </dl>
+      <div class="legend" aria-label="Difficulty colours"><span><i style="background:#F2C14E"></i>Easy</span><span><i style="background:#E8833A"></i>Moderate</span><span><i style="background:#C2410C"></i>Hard</span><span><i style="background:#7C2D12"></i>Very hard</span></div>
+      <details id="compare" class="compare">
+        <summary>Compare with off-trail only and straight line</summary>
+        <table><thead><tr><th></th><th id="cmpDistU">mi</th><th>Effort</th></tr></thead><tbody id="cmpBody"></tbody></table>
+        <label class="row small"><input type="checkbox" id="showCompare"> Show them on the map</label>
+      </details>
+      <ul id="notes" class="notes"></ul>
+    </div>
+  </section>
+
+  <section id="tab-saved" class="tab" hidden>
+    <h2 class="tabtitle">Saved</h2>
+    <p class="hint">Kept routes stay on the map until you hide or delete them.</p>
+    <div id="savedList" class="list"></div>
+  </section>
+
+  <section id="tab-areas" class="tab" hidden>
+    <h2 class="tabtitle">Areas</h2>
+    <p class="hint">Move the map to put the square over the ground you want. Routes are most reliable inside the dashed line.</p>
+    <div class="seg" role="group" aria-label="Area size"><button data-size="4">8 × 8 km</button><button data-size="2">4 × 4 km</button><button data-size="1">2 × 2 km</button></div>
+    <p id="sizeNote" class="hint"></p>
+    <button id="btnPrepare" class="primary">Download this area</button>
+    <p id="prepMsg" class="msg" role="status"></p>
+    <div class="label">On this device</div>
+    <div id="areaList" class="list"></div>
+    <div class="actions">
+      <button id="btnBackup" class="secondary">Back up areas</button>
+      <label class="secondary filebtn">Import backup<input type="file" id="importFile" accept=".trarea,application/octet-stream" hidden></label>
+    </div>
+    <p id="backupMsg" class="msg" role="status"></p>
+  </section>
+
+  <section id="tab-settings" class="tab" hidden>
+    <h2 class="tabtitle">Settings</h2>
+    <div class="label">Units</div>
+    <div class="seg" role="group" aria-label="Units"><button data-units="imperial">Miles · feet</button><button data-units="metric">Kilometres · metres</button></div>
+    <div class="label">Storage on this device</div>
+    <p id="storageFacts" class="hint"></p>
+    <button id="btnPersist" class="secondary">Ask to keep my data</button>
+    <p class="hint">Areas, kept routes and settings live only in this browser on this device. Nothing is uploaded. Clearing website data deletes them: use Back up areas.</p>
+    <p id="version" class="hint"></p>
+  </section>
+</aside>
+
+<div id="toast" class="toast" role="alert" hidden></div>
+<script type="module" src="ui/main.js"></script>
+</body>
+</html>
