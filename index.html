@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="TR Test">
+<meta name="theme-color" content="#c4561b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="stylesheet" href="maplibre/maplibre-gl.css">
+<title>TerrainRoute iPhone Test</title>
+<!--
+SECTION MAP
+  STYLE / MARKUP       phone layout: steps, map, test buttons, results
+  // === STATE ===     results object (persisted in localStorage), named setters
+  // === STORAGE ===   service worker, download area into Cache Storage, persistence + eviction check
+  // === MAP ===       MapLibre on cached tiles, pins, route line
+  // === TESTS ===     GPS fix, on-phone routing (+ parity vs Python), GPX share to onX
+  // === RESULTS ===   render + copy (no coordinates are ever included)
+  // === INIT ===
+-->
+<style>
+  :root { --accent:#c4561b; --ink:#1d1d1b; --muted:#6b6b66; --line:#ddd9d0; --ok:#1a7f1a; --bad:#b3261e; --bg:#f6f5f2; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.4 -apple-system, system-ui, sans-serif; color:var(--ink); background:var(--bg);
+         padding:env(safe-area-inset-top) 12px calc(env(safe-area-inset-bottom) + 16px); }
+  h1 { font-size:19px; margin:10px 0 2px; } .sub { color:var(--muted); font-size:12px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin:10px 0; }
+  .card h2 { font-size:15px; margin:0 0 6px; }
+  button { font:inherit; font-size:15px; padding:10px 12px; border-radius:8px; border:1px solid var(--line); background:#fff; margin:3px 0; width:100%; }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+  .row { display:flex; gap:8px; } .row > * { flex:1; }
+  #map { height:46vh; border-radius:10px; border:1px solid var(--line); margin:10px 0; }
+  .msg { font-size:13px; color:var(--muted); margin-top:4px; min-height:1em; }
+  ol { margin:4px 0; padding-left:20px; font-size:14px; } li { margin:3px 0; }
+  #results { font:12px/1.35 ui-monospace, Menlo, monospace; white-space:pre-wrap; background:#fbfaf8; border:1px solid var(--line); border-radius:8px; padding:8px; }
+  .pass { color:var(--ok); font-weight:600; } .fail { color:var(--bad); font-weight:600; }
+  .pin { width:16px; height:16px; border-radius:50%; border:2px solid #000; }
+</style>
+</head>
+<body>
+<h1>TerrainRoute: iPhone test</h1>
+<div class="sub">Offline feasibility test for the web-app option. Public Marvine test area only. Build <span id="build">2026-10-30a</span></div>
+
+<div class="card">
+  <h2>Steps</h2>
+  <ol>
+    <li>In Safari: Share ⎋ → <b>Add to Home Screen</b>. Open <b>TR Test</b> from the home screen.</li>
+    <li>Still online, in the home-screen app: tap <b>Download test area</b>.</li>
+    <li>Turn on <b>Airplane mode</b> (Wi-Fi off too). Close the app fully, then reopen it.</li>
+    <li>Tap the tests below, then <b>Copy results</b> and send them to Claude.</li>
+    <li>In 3–7 days, open it again in airplane mode and copy the results again (does iOS keep the data?).</li>
+  </ol>
+  <div class="msg" id="mode"></div>
+</div>
+
+<div class="card">
+  <h2>1 · Offline storage</h2>
+  <button class="primary" id="dl">Download test area</button>
+  <div class="msg" id="dlMsg"></div>
+</div>
+
+<div id="map"></div>
+
+<div class="card">
+  <h2>2 · GPS without signal</h2>
+  <button id="gps">Get my location</button>
+  <div class="msg" id="gpsMsg"></div>
+</div>
+
+<div class="card">
+  <h2>3 · Route on the phone</h2>
+  <div class="row"><button id="caseA">Case A</button><button id="caseC">Case C</button></div>
+  <div class="row"><button id="caseAp">Case A pack-out</button><button id="tap">Tap 2 points</button></div>
+  <div class="msg" id="routeMsg"></div>
+</div>
+
+<div class="card">
+  <h2>4 · GPX to onX</h2>
+  <button id="share">Share GPX of last route</button>
+  <div class="msg" id="shareMsg"></div>
+</div>
+
+<div class="card">
+  <h2>Results</h2>
+  <div id="results"></div>
+  <button class="primary" id="copy">Copy results</button>
+  <div class="msg" id="copyMsg"></div>
+</div>
+
+<script src="maplibre/maplibre-gl.js"></script>
+<script src="utm.js"></script>
+<script src="solver.js"></script>
+<script>
+// === STATE ===
+const $ = id => document.getElementById(id);
+const CACHE = "tr-test-v1", RKEY = "trtest.results.v1";
+const state = { meta: null, dem: null, ref: null, last: null, tapping: 0, tapPts: [], markers: [] };
+let results = {};
+try { results = JSON.parse(localStorage.getItem(RKEY) || "{}"); } catch (_) { results = {}; }
+function setResult(key, value) {
+  results[key] = value;
+  try { localStorage.setItem(RKEY, JSON.stringify(results)); } catch (_) { /* storage blocked: results stay in memory */ }
+  renderResults();
+}
+const standalone = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+
+// === STORAGE ===
+async function registerSW() {
+  if (!("serviceWorker" in navigator)) { setResult("serviceWorker", "NOT SUPPORTED"); return; }
+  try { await navigator.serviceWorker.register("sw.js"); setResult("serviceWorker", "registered"); }
+  catch (e) { setResult("serviceWorker", `FAILED: ${e.message}`); }
+}
+
+async function storageFacts() {
+  const out = {};
+  try { const e = await navigator.storage.estimate(); out.usedMB = +(e.usage / 2 ** 20).toFixed(1); out.quotaMB = Math.round(e.quota / 2 ** 20); }
+  catch (e) { out.estimate = `unavailable (${e.message})`; }
+  try { out.persisted = await navigator.storage.persisted(); } catch (_) { out.persisted = "unknown"; }
+  return out;
+}
+
+// Download shell + data + every tile into Cache Storage, from inside whatever context is running (app or Safari).
+async function downloadArea() {
+  const msg = $("dlMsg");
+  try {
+    const meta = await (await fetch("meta.json", { cache: "no-store" })).json();
+    const urls = ["./", "index.html", "utm.js", "solver.js", "manifest.webmanifest", "icon-180.png", "icon-512.png",
+                  "maplibre/maplibre-gl.js", "maplibre/maplibre-gl.css", "meta.json", "dem.bin", "reference.json", ...meta.tiles];
+    const cache = await caches.open(CACHE);
+    let done = 0, failed = 0;
+    for (let i = 0; i < urls.length; i += 8) {
+      await Promise.all(urls.slice(i, i + 8).map(u => cache.add(u).then(() => done++, () => failed++)));
+      msg.textContent = `Downloading… ${done + failed}/${urls.length}`;
+    }
+    let persist = "unsupported";
+    try { persist = await navigator.storage.persist(); } catch (_) { /* Safari may not offer it */ }
+    const facts = await storageFacts();
+    setResult("download", { files: done, failed, inInstalledApp: standalone(), persistGranted: persist, ...facts,
+                            at: new Date().toISOString() });
+    if (!results.installedAt && standalone()) setResult("installedAt", new Date().toISOString());
+    msg.textContent = failed ? `${failed} files failed; tap again.` : `Done: ${done} files cached. Now go to airplane mode.`;
+    await loadData();
+  } catch (e) { msg.textContent = `Download failed: ${e.message}`; setResult("download", `FAILED: ${e.message}`); }
+}
+
+// On every open: is the cached data still there? (iOS may evict website data.)
+async function evictionCheck() {
+  const meta = state.meta;
+  let tilesPresent = 0, dem = false;
+  try {
+    const cache = await caches.open(CACHE);
+    dem = !!(await cache.match("dem.bin"));
+    if (meta) for (const t of meta.tiles) if (await cache.match(t)) tilesPresent++;
+  } catch (e) { setResult("lastOpen", `cache check FAILED: ${e.message}`); return; }
+  const days = results.installedAt ? ((Date.now() - Date.parse(results.installedAt)) / 864e5).toFixed(1) : "n/a";
+  setResult("lastOpen", { at: new Date().toISOString(), online: navigator.onLine, inInstalledApp: standalone(), daysSinceDownload: days,
+                          demCached: dem, tilesCached: `${tilesPresent}/${meta ? meta.tiles.length : "?"}`, ...(await storageFacts()) });
+}
+
+async function loadData() {
+  const t0 = performance.now();
+  state.meta = await (await fetch("meta.json")).json();
+  state.dem = new Float32Array(await (await fetch("dem.bin")).arrayBuffer());
+  state.ref = await (await fetch("reference.json")).json();
+  if (state.dem.length !== state.meta.rows * state.meta.cols) throw new Error("dem.bin size does not match meta.json");
+  setResult("dataLoadMs", Math.round(performance.now() - t0));
+  showArea();
+}
+
+// === MAP ===
+const map = new maplibregl.Map({ container: "map", center: [-107.4, 40.0], zoom: 12,
+  style: { version: 8, sources: { topo: { type: "raster", tiles: [location.href.replace(/[^/]*$/, "") + "tiles/{z}/{x}/{y}.jpg"], tileSize: 256, minzoom: 11, maxzoom: 16 } },
+           layers: [{ id: "bg", type: "background", paint: { "background-color": "#e8e6e1" } }, { id: "topo", type: "raster", source: "topo" }] } });
+const mapReady = new Promise(res => map.on("load", res));
+
+async function showArea() {
+  await mapReady;
+  const [[s, w], [n, e]] = state.meta.bounds;
+  map.fitBounds([[w, s], [e, n]], { padding: 10, duration: 0 });
+  if (!map.getSource("route")) {
+    map.addSource("route", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+    map.addLayer({ id: "route", type: "line", source: "route", paint: { "line-color": "#ff7f0e", "line-width": 4 } });
+  }
+}
+
+function pin(lonlat, color) {
+  const el = document.createElement("div"); el.className = "pin"; el.style.background = color;
+  state.markers.push(new maplibregl.Marker({ element: el }).setLngLat(lonlat).addTo(map));
+}
+function clearPins() { for (const m of state.markers) m.remove(); state.markers = []; }
+
+// === TESTS ===
+function testGps() {
+  const msg = $("gpsMsg"), t0 = performance.now();
+  if (!navigator.geolocation) { setResult("gps", "NOT SUPPORTED"); return; }
+  msg.textContent = "Waiting for a GPS fix (can take a minute with no signal)…";
+  navigator.geolocation.getCurrentPosition(
+    p => {
+      const secs = ((performance.now() - t0) / 1000).toFixed(1), acc = Math.round(p.coords.accuracy);
+      msg.textContent = `Fix in ${secs} s, ±${acc} m (your position is shown here only, never copied).`;
+      setResult("gps", { ok: true, secondsToFix: +secs, accuracyM: acc, online: navigator.onLine, altitude: p.coords.altitude !== null });
+    },
+    e => { msg.textContent = `No fix: ${e.message} (code ${e.code})`; setResult("gps", { ok: false, code: e.code, message: e.message, online: navigator.onLine }); },
+    { enableHighAccuracy: true, timeout: 90000, maximumAge: 0 });
+}
+
+const toUtm = (lon, lat) => UTM.forward(lon, lat, state.meta.zone);
+const toLonLat = (x, y) => UTM.inverse(x, y, state.meta.zone);
+const cellXY = id => { const m = state.meta, r = Math.floor(id / m.cols), c = id - r * m.cols;
+                       return [m.xmin + (c + 0.5) * m.cell, m.ymax - (r + 0.5) * m.cell]; };
+
+// Route between two cells; returns timings, metrics and (for public cases) parity with the Python engine.
+function routeCells(src, dst, mode, label, refKey) {
+  const m = state.meta, p = TR.PROFILES[mode];
+  const t0 = performance.now(), S = TR.prepare(state.dem, m.rows, m.cols, m.cell, p), t1 = performance.now();
+  const res = TR.solve(S, src, dst), t2 = performance.now();
+  const out = { mode, prepareMs: Math.round(t1 - t0), solveMs: Math.round(t2 - t1), settled: res.settled };
+  if (!Number.isFinite(res.cost)) { out.result = "unreachable"; }
+  else {
+    const xy = res.nodes.map(cellXY), z = res.nodes.map(i => state.dem[i]);
+    let dist = 0, up = 0, down = 0;
+    for (let i = 1; i < xy.length; i++) { dist += Math.hypot(xy[i][0] - xy[i - 1][0], xy[i][1] - xy[i - 1][1]); const d = z[i] - z[i - 1]; if (d > 0) up += d; else down -= d; }
+    out.effortKm = +TR.effortKm(res.cost).toFixed(3); out.distanceM = Math.round(dist); out.ascentM = Math.round(up); out.descentM = Math.round(down);
+    const ll = xy.map(([x, y]) => toLonLat(x, y));
+    state.last = { label, ll, z };
+    map.getSource("route").setData({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: ll } });
+  }
+  if (refKey && state.ref[refKey]) {
+    const py = state.ref[refKey].effort_km;
+    out.matchesPython = py === undefined ? out.result === "unreachable" : Math.abs(out.effortKm - py) / py < 1e-4;
+  }
+  return out;
+}
+
+async function runCase(name, mode) {
+  if (!state.dem) { $("routeMsg").textContent = "Download the test area first."; return; }
+  const key = `${name}|${mode}`, r = state.ref[key];
+  clearPins();
+  pin(toLonLat(...cellXY(r.src)), "#fff"); pin(toLonLat(...cellXY(r.dst)), "#ffd400");
+  $("routeMsg").textContent = "Calculating…";
+  await new Promise(res => setTimeout(res, 30));  // let the message paint before the solver blocks
+  const out = routeCells(r.src, r.dst, mode, name, key);
+  setResult(`route ${name.split("_")[0]} ${mode}`, out);
+  $("routeMsg").textContent = out.result ? `Unreachable (${out.solveMs} ms)` :
+    `${(out.distanceM / 1609.34).toFixed(2)} mi, effort ${out.effortKm.toFixed(1)}, solved in ${out.solveMs} ms (+${out.prepareMs} ms setup)`
+    + (out.matchesPython !== undefined ? ` · matches Python: ${out.matchesPython ? "yes" : "NO"}` : "");
+}
+
+function startTap() { state.tapping = 2; state.tapPts = []; clearPins(); $("routeMsg").textContent = "Tap the start, then the end, on the map."; }
+map.on("click", async e => {
+  if (!state.tapping || !state.dem) return;
+  const [x, y] = toUtm(e.lngLat.lng, e.lngLat.lat), m = state.meta;
+  const S = TR.prepare(state.dem, m.rows, m.cols, m.cell, TR.PROFILES.normal), id = TR.snap(S, x, y, m.xmin, m.ymax);
+  if (id < 0) { $("routeMsg").textContent = "No walkable ground there (or outside the area). Tap again."; return; }
+  state.tapPts.push(id); pin([e.lngLat.lng, e.lngLat.lat], state.tapPts.length === 1 ? "#fff" : "#ffd400");
+  if (--state.tapping) return;
+  $("routeMsg").textContent = "Calculating…";
+  await new Promise(res => setTimeout(res, 30));
+  const out = routeCells(state.tapPts[0], state.tapPts[1], "normal", "Tapped route");
+  setResult("route tapped", out);
+  $("routeMsg").textContent = out.result ? "Unreachable" : `${(out.distanceM / 1609.34).toFixed(2)} mi, solved in ${out.solveMs} ms`;
+});
+
+function gpxText(last) {
+  const pts = last.ll.map(([lo, la], i) => `<trkpt lat="${la.toFixed(7)}" lon="${lo.toFixed(7)}"><ele>${last.z[i].toFixed(1)}</ele></trkpt>`).join("\n");
+  const [lo0, la0] = last.ll[0], [lo1, la1] = last.ll.at(-1);
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="TerrainRoute iPhone test" xmlns="http://www.topografix.com/GPX/1/1">
+<wpt lat="${la0.toFixed(7)}" lon="${lo0.toFixed(7)}"><name>Test start</name></wpt>
+<wpt lat="${la1.toFixed(7)}" lon="${lo1.toFixed(7)}"><name>Test end</name></wpt>
+<trk><name>TerrainRoute iPhone test (${last.label})</name><trkseg>
+${pts}
+</trkseg></trk>
+</gpx>`;
+}
+
+async function shareGpx() {
+  const msg = $("shareMsg");
+  if (!state.last) { msg.textContent = "Run a route first."; return; }
+  const file = new File([gpxText(state.last)], "TerrainRoute_iPhone_test.gpx", { type: "application/gpx+xml" });
+  if (!(navigator.canShare && navigator.canShare({ files: [file] }))) {
+    const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = file.name; a.click();
+    setResult("share", { canShareFiles: false, fallback: "download link used" });
+    msg.textContent = "This browser can't share files; offered a download instead.";
+    return;
+  }
+  try { await navigator.share({ files: [file], title: "TerrainRoute test route" });
+        setResult("share", { canShareFiles: true, outcome: "share sheet completed", online: navigator.onLine });
+        msg.textContent = "Shared. Did it land in onX? Tell Claude yes/no."; }
+  catch (e) { setResult("share", { canShareFiles: true, outcome: e.name === "AbortError" ? "cancelled" : `error: ${e.message}` });
+              msg.textContent = `Share ${e.name === "AbortError" ? "cancelled" : "failed: " + e.message}`; }
+}
+
+// === RESULTS ===
+function renderResults() {
+  const lines = [`build ${$("build").textContent} · ${navigator.userAgent.replace(/^Mozilla\/5.0 /, "")}`];
+  for (const [k, v] of Object.entries(results)) lines.push(`${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`);
+  $("results").textContent = lines.join("\n");
+}
+async function copyResults() {
+  try { await navigator.clipboard.writeText($("results").textContent); $("copyMsg").textContent = "Copied. Paste it to Claude."; }
+  catch (e) { $("copyMsg").textContent = `Copy failed (${e.message}): select the text above and copy it by hand.`; }
+}
+
+// === INIT ===
+$("mode").textContent = standalone() ? "Running as the installed home-screen app ✓" : "Running in Safari (not installed yet: see step 1).";
+$("dl").addEventListener("click", downloadArea);
+$("gps").addEventListener("click", testGps);
+$("caseA").addEventListener("click", () => runCase("A_trailhead_to_bench", "normal"));
+$("caseAp").addEventListener("click", () => runCase("A_trailhead_to_bench", "packout"));
+$("caseC").addEventListener("click", () => runCase("C_reclimb_avoidance", "normal"));
+$("tap").addEventListener("click", startTap);
+$("share").addEventListener("click", shareGpx);
+$("copy").addEventListener("click", copyResults);
+renderResults();
+registerSW();
+loadData().then(evictionCheck).catch(e => { $("dlMsg").textContent = navigator.onLine ? "Not downloaded yet." : `Offline and no data: ${e.message}`; evictionCheck(); });
+</script>
+</body>
+</html>
