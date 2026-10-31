@@ -3,7 +3,7 @@
 
 const SETTINGS_KEY = "terrainroute.settings.v1";
 const SAVED = ["units", "mode", "friction", "base", "steepOn", "steepOpacity", "trailsOn", "shadeOn", "keptOn", "prepRadius",
-  "areaName"];
+  "areaName", "compareOn", "pointsOn"];
 
 // Off-trail difficulty = how many times the effort of the same metre on a maintained trail (slope penalties stack).
 // ASSUMPTIONS to calibrate in the field.
@@ -21,11 +21,11 @@ export const MODE_HINT = {
 
 export const state = {
   units: "imperial", mode: "normal", friction: 1.8, base: "topo", steepOn: false, steepOpacity: 0.6, trailsOn: true,
-  shadeOn: true, keptOn: true, prepRadius: 4, areaName: null,
+  shadeOn: true, keptOn: true, pointsOn: true, prepRadius: 4, areaName: null,
   areas: [], area: null,                 // area records on this device; the current one (full record)
   origin: null, dest: null, originName: "", destName: "",   // [lat, lon] pins
-  result: null, ghost: null, busy: false, seq: 0, compareOn: false,
-  kept: [], tab: "route", sheet: "peek", threeD: false, layersOpen: false,
+  result: null, ghost: null, busy: false, seq: 0, compareOn: true, selected: "hybrid",
+  kept: [], points: [], tab: "route", sheet: "peek", threeD: false, layersOpen: false,
 };
 
 export function loadSettings() {
@@ -53,12 +53,13 @@ export function set(patch) {
 // A new pin or area makes the old answer stale; a changed assumption keeps it as the grey comparison line.
 export function setPoint(which, latlon) {
   state[which] = latlon;
+  state.selected = "hybrid";
   state.result = null;
   state.ghost = null;
 }
 
 export function setAssumption(patch) {
-  const hy = state.result?.routes.find(r => r.label === "hybrid");
+  const hy = state.result?.routes.find(r => r.label === state.selected) || state.result?.routes.find(r => r.label === "hybrid");
   if (hy) state.ghost = hy;
   set(patch);
 }

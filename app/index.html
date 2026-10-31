@@ -50,6 +50,7 @@
   <label class="row line">Trails<input type="checkbox" id="ovTrails"></label>
   <label class="row line">Route difficulty colours<input type="checkbox" id="ovShade"></label>
   <label class="row line">Kept routes<input type="checkbox" id="ovKept"></label>
+  <label class="row line">Saved points<input type="checkbox" id="ovPoints"></label>
 </section>
 
 <aside id="panel" class="panel" data-sheet="peek">
@@ -69,7 +70,7 @@
   <section id="tab-route" class="tab">
     <p id="routeEmpty" class="empty"></p>
     <div id="routeBody" class="routebody">
-      <div class="summary">
+      <div class="summary needs-result">
         <div class="titlerow"><h2 id="routeTitle">Start → End</h2><span id="routeState" class="state"></span></div>
         <div class="stats">
           <div><b id="sDist">–</b><span id="sDistU">mi</span></div>
@@ -79,43 +80,47 @@
         </div>
         <div id="strip" class="strip" aria-hidden="true"></div>
       </div>
-      <div class="actions">
+      <div class="actions needs-result">
         <button id="btnGpx" class="primary">Share GPX</button>
         <button id="btnKeep" class="secondary">Keep</button>
       </div>
       <div class="points">
-        <div class="pt"><span class="pin a">A</span><div><input id="nameA" aria-label="Start name" placeholder="Start" maxlength="40"><div id="coordA" class="coord">Tap the map to set</div></div><button id="locA" class="mini" aria-label="Use my location as start"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l18-8-8 18-2-8z"></path></svg></button></div>
-        <div class="pt"><span class="pin b">B</span><div><input id="nameB" aria-label="End name" placeholder="End" maxlength="40"><div id="coordB" class="coord">Tap the map to set</div></div><button id="swap" class="mini" aria-label="Swap start and end"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M3 8l4-4 4 4M17 20V4M21 16l-4 4-4-4"></path></svg></button></div>
+        <div class="pt"><span class="pin a">A</span><div><input id="nameA" aria-label="Start name" placeholder="Start" maxlength="40"><input id="coordA" class="coord" aria-label="Start coordinates" placeholder="Paste lat, lon" inputmode="decimal" autocomplete="off"><select id="pickA" class="pick" aria-label="Start at a saved point"></select></div><button id="saveA" class="mini" aria-label="Save start as a point"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"></path></svg></button><button id="locA" class="mini" aria-label="Use my location as start"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l18-8-8 18-2-8z"></path></svg></button></div>
+        <div class="pt"><span class="pin b">B</span><div><input id="nameB" aria-label="End name" placeholder="End" maxlength="40"><input id="coordB" class="coord" aria-label="End coordinates" placeholder="Paste lat, lon" inputmode="decimal" autocomplete="off"><select id="pickB" class="pick" aria-label="End at a saved point"></select></div><button id="saveB" class="mini" aria-label="Save end as a point"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"></path></svg></button><button id="swap" class="mini" aria-label="Swap start and end"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M3 8l4-4 4 4M17 20V4M21 16l-4 4-4-4"></path></svg></button></div>
       </div>
       <div class="moderow">
         <div class="seg" role="group" aria-label="Mode"><button data-mode="normal">Normal</button><button data-mode="packout">Pack-out</button></div>
         <label class="fric">Off-trail<select id="friction"></select></label>
       </div>
       <p id="modeHint" class="hint"></p>
-      <div class="card profile">
+      <div class="card profile needs-result">
         <div class="readout"><span>Elevation</span><b id="profileReadout"></b></div>
         <svg id="profile" viewBox="0 0 320 100" role="img" aria-label="Elevation profile"></svg>
         <div class="pstats"><div>Start<b id="pStart">–</b></div><div>End<b id="pEnd">–</b></div><div>High<b id="pHigh">–</b></div><div>Low<b id="pLow">–</b></div></div>
       </div>
-      <dl class="details">
+      <dl class="details needs-result">
         <div><dt>On trail</dt><dd id="dTrail">–</dd></div>
         <div><dt>Off trail</dt><dd id="dOff">–</dd></div>
         <div><dt>Hardest 200 m</dt><dd id="dHard">–</dd></div>
       </dl>
-      <div class="legend" aria-label="Difficulty colours"><span><i style="background:#F2C14E"></i>Easy</span><span><i style="background:#E8833A"></i>Moderate</span><span><i style="background:#C2410C"></i>Hard</span><span><i style="background:#7C2D12"></i>Very hard</span></div>
-      <details id="compare" class="compare">
-        <summary>Compare with off-trail only and straight line</summary>
-        <table><thead><tr><th></th><th id="cmpDistU">mi</th><th>Effort</th></tr></thead><tbody id="cmpBody"></tbody></table>
-        <label class="row small"><input type="checkbox" id="showCompare"> Show them on the map</label>
-      </details>
+      <div class="legend needs-result" aria-label="Difficulty colours"><span><i style="background:#F2C14E"></i>Easy</span><span><i style="background:#E8833A"></i>Moderate</span><span><i style="background:#C2410C"></i>Hard</span><span><i style="background:#7C2D12"></i>Very hard</span></div>
+      <div id="routes" class="routes needs-result">
+        <div class="label">Routes</div>
+        <div id="routeChoices" class="choices" role="radiogroup" aria-label="Which route to show"></div>
+        <label class="row small"><input type="checkbox" id="showCompare"> Show all three on the map</label>
+      </div>
       <ul id="notes" class="notes"></ul>
     </div>
   </section>
 
   <section id="tab-saved" class="tab" hidden>
     <h2 class="tabtitle">Saved</h2>
+    <div class="label">Routes</div>
     <p class="hint">Kept routes stay on the map until you hide or delete them.</p>
     <div id="savedList" class="list"></div>
+    <div class="label">Points</div>
+    <p class="hint">Save a point from the map (right-click, or long-press on a phone) or with the star next to A or B.</p>
+    <div id="pointList" class="list"></div>
   </section>
 
   <section id="tab-areas" class="tab" hidden>

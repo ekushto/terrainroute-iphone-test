@@ -35,6 +35,27 @@ export function renderSaved() {
   }));
 }
 
+// Saved points: each can start or end a route, be renamed or deleted. The area it falls in is shown for context.
+// Rebuilt only when the points change, so a rename in progress or an armed Delete survives other redraws.
+export function renderPoints() {
+  const list = $("pointList"), key = JSON.stringify([state.points, state.areas.map(areaLabel), state.units]);
+  if (list.dataset.key === key) return;
+  list.dataset.key = key;
+  if (!state.points.length) {
+    list.innerHTML = '<p class="empty">No saved points yet.</p>';
+    return;
+  }
+  list.replaceChildren(...state.points.map(p => {
+    const area = state.areas.find(a => { const [[s, w], [n, e]] = inscribedBounds(a); return p.lat > s && p.lat < n && p.lon > w && p.lon < e; });
+    const el = item(`<div class="top"><div><div class="name"></div><div class="sub"></div></div></div>
+      <div class="btns"><button data-act="start" data-id="${esc(p.id)}">Start</button><button data-act="end" data-id="${esc(p.id)}">End</button>
+      <button data-act="rename" data-id="${esc(p.id)}">Rename</button><button data-act="del" data-id="${esc(p.id)}" class="danger">Delete</button></div>`);
+    el.querySelector(".name").textContent = p.name;
+    el.querySelector(".sub").textContent = `${p.lat.toFixed(5)}, ${p.lon.toFixed(5)} · ${area ? areaLabel(area) : "outside your areas"}`;
+    return el;
+  }));
+}
+
 export function renderAreas(tilesPresent) {
   const list = $("areaList");
   if (!state.areas.length) {

@@ -27,6 +27,7 @@ svg.filled { stroke: none; }
 .icon.text { font-size: 14px; font-weight: 700; }
 .icon[aria-pressed="true"] { background: var(--accent); color: #fff; }
 #btnLocate { color: var(--loc); }
+#btnNorth svg { transition: transform 0.1s linear; }
 .maplibregl-ctrl-scale { border-color: var(--ink); color: var(--ink); background: rgba(255, 255, 255, 0.85); }
 
 /* === layers === */
@@ -91,7 +92,13 @@ svg.filled { stroke: none; }
 .pt + .pt { border-top: 1px solid var(--line); }
 .pt > div { flex: 1; min-width: 0; }
 .pt input { border: 0; padding: 2px 0; width: 100%; font-weight: 600; font-size: 15px; outline: 0; background: transparent; }
-.coord { font-size: 12px; color: var(--muted); }
+.pt input.coord { font-size: 13px; font-weight: 400; color: var(--muted); }
+.pt input.coord:focus { color: var(--ink); }
+.choices { display: flex; flex-direction: column; gap: 6px; }
+.choice { display: grid; grid-template-columns: 14px 1fr auto auto; gap: 10px; align-items: center; text-align: left; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 8px 10px; font-size: 14px; min-height: 44px; }
+.choice.on { border: 2px solid var(--accent); padding: 7px 9px; font-weight: 600; }
+.choice i { width: 14px; height: 4px; border-radius: 2px; }
+.choice span:not(:first-child) { color: var(--muted); font-weight: 400; }
 .pin { width: 26px; height: 26px; border-radius: 50%; color: #fff; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex: none; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35); }
 .pin.a { background: var(--ink); }
 .pin.b { background: var(--accent); }
@@ -116,6 +123,7 @@ svg.filled { stroke: none; }
 .legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--muted); }
 .legend span { display: flex; align-items: center; gap: 4px; }
 .legend i { width: 12px; height: 6px; display: inline-block; }
+.routes { border-top: 1px solid var(--line); padding-top: 4px; }
 .compare { border-top: 1px solid var(--line); padding-top: 8px; font-size: 14px; }
 .compare summary { cursor: pointer; font-weight: 600; min-height: 32px; }
 .compare table { width: 100%; border-collapse: collapse; margin: 6px 0; }
@@ -138,7 +146,9 @@ svg.filled { stroke: none; }
 .toast { position: fixed; z-index: 10; left: 50%; transform: translateX(-50%); max-width: min(92vw, 480px); background: var(--ink); color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 14px; box-shadow: var(--shadow); }
 
 /* map markers */
-.mk-pin { width: 30px; height: 30px; font-size: 14px; }
+.mk-pin { display: flex; align-items: center; gap: 4px; pointer-events: auto; cursor: grab; z-index: 2; }
+.mk-pin .pin { width: 30px; height: 30px; font-size: 14px; }
+.mk-pin .tag { background: var(--panel); border-radius: 8px; padding: 2px 7px; font-size: 12px; font-weight: 600; box-shadow: var(--shadow); white-space: nowrap; }
 .mk-hover { width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 3px solid var(--ink); }
 .mk-tag { background: var(--panel); border-radius: 8px; padding: 3px 7px; font-size: 12px; font-weight: 600; box-shadow: var(--shadow); white-space: nowrap; }
 .mk-me { width: 18px; height: 18px; border-radius: 50%; background: var(--loc); border: 3px solid #fff; box-shadow: 0 0 0 8px rgba(37, 99, 235, 0.2); }
@@ -165,7 +175,7 @@ svg.filled { stroke: none; }
   .mapbtns.bottom { right: 16px; bottom: 40px; }
   .layers { top: 16px; right: 76px; width: 330px; max-height: calc(100vh - 32px); border-radius: 14px; }
   .routebody .points { order: 1; } .routebody .moderow { order: 2; } #modeHint { order: 3; } .routebody .summary { order: 4; }
-  .routebody .profile { order: 5; } .routebody .details { order: 6; } .routebody .legend { order: 7; } .routebody .compare { order: 8; }
+  .routebody .profile { order: 5; } .routebody .details { order: 6; } .routebody .legend { order: 7; } .routebody .routes { order: 8; }
   .routebody .actions { order: 9; } .routebody .notes { order: 10; }
   .toast { top: 16px; }
 }
@@ -187,3 +197,12 @@ svg.filled { stroke: none; }
   .maplibregl-ctrl-bottom-left { bottom: calc(var(--tabbar) + var(--sheet-h)); }
   .toast { top: calc(env(safe-area-inset-top) + 66px); }
 }
+.mk-point { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+.mk-point .dot { width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 3px solid var(--ink); flex: none; }
+.mk-point .tag { background: var(--panel); border-radius: 8px; padding: 2px 7px; font-size: 12px; font-weight: 600; box-shadow: var(--shadow); white-space: nowrap; }
+.pop .title { font-size: 14px; }
+.pop .sp { background: var(--panel); color: var(--ink); border: 1px solid var(--line); }
+.pop .save { display: flex; gap: 6px; }
+.pop .save input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-size: 14px; }
+.pop .save button { flex: none; padding: 0 12px; background: var(--accent); }
+.pt select.pick { border: 0; padding: 2px 0; font-size: 13px; color: var(--accent); background: transparent; max-width: 100%; }

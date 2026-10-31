@@ -1,4 +1,4 @@
-// Backup file (.trarea): areas (elevation, trails, box), their offline map tiles and kept routes in one binary file,
+// Backup file (.trarea): areas (elevation, trails, box), their offline map tiles, kept routes and saved points in one binary file,
 // to restore after the browser's data is cleared or to move areas from the Mac to the phone without re-downloading.
 // Layout: "TRAREA1\n", a little-endian uint32 header length, the JSON header, then the binary parts it points into.
 
@@ -7,9 +7,9 @@ export const BACKUP_VERSION = 1;
 
 export class BackupError extends Error {}
 
-// Blob of a backup. areas: area records (with dem Float32Array); tiles: Map url -> Blob; routes: kept route records.
-export function packBackup(areas, tiles, routes) {
-  const parts = [], header = { version: BACKUP_VERSION, exportedAt: new Date().toISOString(), areas: [], tiles: [], routes };
+// Blob of a backup. areas: area records (with dem Float32Array); tiles: Map url -> Blob; routes / points: records.
+export function packBackup(areas, tiles, routes, points = []) {
+  const parts = [], header = { version: BACKUP_VERSION, exportedAt: new Date().toISOString(), areas: [], tiles: [], routes, points };
   let offset = 0;
   const add = blob => { parts.push(blob); const at = offset; offset += blob.size; return { offset: at, length: blob.size }; };
   for (const a of areas) {
@@ -22,7 +22,7 @@ export function packBackup(areas, tiles, routes) {
   return new Blob([MAGIC, len, json, ...parts], { type: "application/octet-stream" });
 }
 
-// { areas (dem restored as Float32Array), tiles: [{ url, blob }], routes } from a backup's bytes. Throws BackupError
+// { areas (dem restored as Float32Array), tiles: [{ url, blob }], routes, points } from a backup's bytes. Throws BackupError
 // on anything that is not a complete backup of a version this app reads.
 export function unpackBackup(buf) {
   const bytes = new Uint8Array(buf), magic = new TextDecoder().decode(bytes.subarray(0, MAGIC.length));
@@ -45,5 +45,5 @@ export function unpackBackup(buf) {
     return out;
   });
   const tiles = header.tiles.map(t => ({ url: t.url, blob: new Blob([slice(t)], { type: t.type }) }));
-  return { areas, tiles, routes: header.routes || [], exportedAt: header.exportedAt };
+  return { areas, tiles, routes: header.routes || [], points: header.points || [], exportedAt: header.exportedAt };
 }

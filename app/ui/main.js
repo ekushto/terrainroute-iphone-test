@@ -4,7 +4,7 @@ import { boxRings, regionBox } from "../prepare/box.js";
 import { tilesPresent } from "../store/areas.js";
 import * as actions from "./actions.js";
 import { bindEvents } from "./events.js";
-import { renderAreas, renderSaved, renderSettings } from "./lists.js";
+import { renderAreas, renderPoints, renderSaved, renderSettings } from "./lists.js";
 import * as mapui from "./map.js";
 import { renderRoute } from "./route-panel.js";
 import { loadSettings, set, state } from "./state.js";
@@ -36,6 +36,7 @@ export function render() {
   $("areaChip").classList.toggle("ready", !!state.area);
   renderRoute();
   renderSaved();
+  renderPoints();
   for (const b of document.querySelectorAll("[data-size]")) b.classList.toggle("on", Number(b.dataset.size) === state.prepRadius);
   $("sizeNote").textContent = SIZE_NOTE[state.prepRadius];
   for (const b of document.querySelectorAll("[data-base]")) b.classList.toggle("on", b.dataset.base === state.base);
@@ -43,6 +44,7 @@ export function render() {
   $("ovTrails").checked = state.trailsOn;
   $("ovShade").checked = state.shadeOn;
   $("ovKept").checked = state.keptOn;
+  $("ovPoints").checked = state.pointsOn;
   $("steepOpacity").value = Math.round(state.steepOpacity * 100);
   $("layers").hidden = !state.layersOpen;
   $("btnLayers").setAttribute("aria-expanded", String(state.layersOpen));
@@ -88,6 +90,9 @@ export function updatePreview() {
 // Install the service worker (offline app + saved map tiles) and show which build is running.
 function registerOffline() {
   if (!("serviceWorker" in navigator)) { $("version").textContent = "Offline use is not available in this browser."; return; }
+  // A new build takes over in the background; reload once so the page never runs a mix of old and new files.
+  const hadController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadController) location.reload(); }, { once: true });
   navigator.serviceWorker.register("sw.js").catch(e => { $("version").textContent = `Offline use failed to start: ${e.message}`; });
   navigator.serviceWorker.addEventListener("message", e => { if (e.data?.build) $("version").textContent = `Build ${e.data.build}`; });
   navigator.serviceWorker.ready.then(reg => reg.active?.postMessage("build"));

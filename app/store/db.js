@@ -1,7 +1,7 @@
-// The app's one IndexedDB database: "areas" (prepared areas) and "routes" (kept routes). Per device, never uploaded.
+// The app's one IndexedDB database: "areas" (prepared areas), "routes" (kept routes) and "points" (saved points). Per device, never uploaded.
 
-const DB = "terrainroute", VERSION = 2;
-const STORES = { areas: "name", routes: "id" };
+const DB = "terrainroute", VERSION = 3;
+const STORES = { areas: "name", routes: "id", points: "id" };
 
 export class StoreError extends Error {}
 

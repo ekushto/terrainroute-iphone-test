@@ -1,7 +1,7 @@
 // Offline support. The app's own files are cached at install (cache-first, replaced as a whole when BUILD changes);
 // USGS map tiles saved with an area are answered from the tile cache, so the map works with no signal. Everything
 // else goes to the network as usual. BUILD is a hash of the app files, written by `npm run stamp` (a test checks it).
-const BUILD = "460de55dd3cc";
+const BUILD = "d8b69c295945";
 const APP_CACHE = `tr-app-${BUILD}`, TILE_CACHE = "tr-tiles-v1", TILE_HOST = "basemap.nationalmap.gov";
 const APP_FILES = [
   "./", "index.html", "app.css", "manifest.webmanifest", "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png",
@@ -9,14 +9,16 @@ const APP_FILES = [
   "engine/compute.js", "engine/cost.js", "engine/gpx.js", "engine/graph.js", "engine/grid.js", "engine/measure.js",
   "engine/pynum.js", "engine/route.js", "engine/search.js", "engine/utm.js",
   "prepare/box.js", "prepare/overlay.js", "prepare/prepare.js", "prepare/sources.js", "prepare/tiles.js",
-  "store/areas.js", "store/backup.js", "store/db.js", "store/routes.js",
+  "store/areas.js", "store/backup.js", "store/db.js", "store/points.js", "store/routes.js",
   "ui/actions.js", "ui/engine.js", "ui/events.js", "ui/lists.js", "ui/main.js", "ui/map.js", "ui/profile.js",
   "ui/route-panel.js", "ui/shade.js", "ui/state.js", "ui/units.js",
   "worker/route-worker.js",
 ];
 
 self.addEventListener("install", e => {
-  e.waitUntil(caches.open(APP_CACHE).then(c => c.addAll(APP_FILES)).then(() => self.skipWaiting()));
+  // cache: "reload" bypasses the browser's HTTP cache, so a new build never stores stale copies of older files
+  e.waitUntil(caches.open(APP_CACHE).then(c => c.addAll(APP_FILES.map(f => new Request(f, { cache: "reload" }))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", e => {

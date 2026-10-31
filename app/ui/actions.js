@@ -5,10 +5,11 @@ import { autoName, inscribedBounds } from "../prepare/box.js";
 import { prepareAround } from "../prepare/prepare.js";
 import { TILE_CACHE, deleteArea, downloadTiles, getArea, listAreas, saveArea, saveTile } from "../store/areas.js";
 import { packBackup, unpackBackup } from "../store/backup.js";
+import { deletePoint, listPoints, newPoint, savePoint } from "../store/points.js";
 import { ROUTE_COLORS, deleteRoutesOfArea, listRoutes, saveRoute } from "../store/routes.js";
 import * as engine from "./engine.js";
 import * as mapui from "./map.js";
-import { bestRoute } from "./route-panel.js";
+import { ROUTE_NAMES, shownRoute } from "./route-panel.js";
 import { pointName, set, setPoint, state } from "./state.js";
 
 export const hooks = { render: () => {}, toast: () => {} };
@@ -18,6 +19,7 @@ export const areaAt = ll => state.areas.find(a => inBox(ll, inscribedBounds(a)))
 export async function reloadLists() {
   state.areas = (await listAreas()).sort((a, b) => (a.label || a.name).localeCompare(b.label || b.name));
   state.kept = await listRoutes();
+  state.points = (await listPoints()).sort((a, b) => a.name.localeCompare(b.name));
   mapui.drawAreaOutlines(state.areas.map(inscribedBounds));
 }
 
@@ -36,13 +38,14 @@ export async function openArea(name, fit = true) {
 
 export function drawAll() {
   mapui.applyLayers(state);
-  mapui.drawPins(state.origin, state.dest, (which, ll) => placePoint(which, ll));
-  mapui.drawResult(state.result, state.ghost, state.shadeOn);
+  mapui.drawPins(state.origin, state.dest, [pointName("origin"), pointName("dest")], (which, ll) => placePoint(which, ll));
+  mapui.drawResult(state.result, state.ghost, state.shadeOn, shownRoute()?.label);
   mapui.drawKept(state.kept.filter(k => k.visible && k.area === state.area?.name));
+  mapui.drawPoints(state.pointsOn ? state.points : [], (p, which) => placePoint(which, [p.lat, p.lon], p.name));
 }
 
-// Put the start or end pin at [lat, lon]. A point in another area switches to that area.
-export async function placePoint(which, ll) {
+// Put the start or end pin at [lat, lon] (named `name` if given). A point in another area switches to that area.
+export async function placePoint(which, ll, name) {
   const target = areaAt(ll);
   if (!target) {
     hooks.toast("That point is outside your downloaded areas. Download an area there first (Areas tab).");
@@ -50,6 +53,7 @@ export async function placePoint(which, ll) {
     return;
   }
   setPoint(which, ll);
+  if (name !== undefined) set({ [`${which}Name`]: name });
   if (target.name !== state.area?.name) return openArea(target.name, false);
   drawAll();
   hooks.render();
@@ -100,16 +104,25 @@ export function shareGpx(raw, zone, title, names = [pointName("origin"), pointNa
   return shareFile(new File([xml], `${slug(title)}.gpx`, { type: "application/gpx+xml" }), title);
 }
 
+// Show another computed route (best / off-trail only / straight line) in the panel and on the map.
+export function selectRoute(label) {
+  if (!state.result?.routes.some(r => r.label === label)) return;
+  state.selected = label;
+  drawAll();
+  hooks.render();
+}
+
 export function shareBest() {
-  const best = bestRoute(state.result);
-  if (best) return shareGpx(best.raw, state.area.zone, `${pointName("origin")} to ${pointName("dest")} (${state.mode})`);
+  const best = shownRoute();
+  const kind = best?.label === "hybrid" ? "" : `, ${ROUTE_NAMES[best?.label]?.toLowerCase()}`;
+  if (best) return shareGpx(best.raw, state.area.zone, `${pointName("origin")} to ${pointName("dest")} (${state.mode}${kind})`);
 }
 
 export async function keepBest() {
-  const best = bestRoute(state.result);
+  const best = shownRoute();
   if (!best) return;
   const color = ROUTE_COLORS[state.kept.filter(k => k.area === state.area.name).length % ROUTE_COLORS.length];
-  await saveRoute({ id: `${Date.now()}`, area: state.area.name, name: `${pointName("origin")} → ${pointName("dest")}`, color,
+  await saveRoute({ id: `${Date.now()}`, area: state.area.name, name: `${pointName("origin")} → ${pointName("dest")}` + (best.label === "hybrid" ? "" : ` (${ROUTE_NAMES[best.label].toLowerCase()})`), color,
     mode: state.mode, friction: state.friction, metrics: best.metrics, latlon: best.latlon, raw: best.raw,
     originName: pointName("origin"), destName: pointName("dest"), visible: true, createdAt: new Date().toISOString() });
   state.kept = await listRoutes();
@@ -117,6 +130,23 @@ export async function keepBest() {
   hooks.render();
   hooks.toast("Kept. It stays on the map; manage it under Saved.");
 }
+
+// Add, change or delete saved points, then show the result everywhere; storage failures become a toast.
+async function changePoints(op, message) {
+  try {
+    await op();
+  } catch (e) {
+    return hooks.toast(`Saved points: ${e.message}`);
+  }
+  await reloadLists();
+  drawAll();
+  hooks.render();
+  if (message) hooks.toast(message);
+}
+
+export const addPoint = (name, ll) => changePoints(() => savePoint(newPoint(name, ll)), "Point saved. Pick it under A or B, or tap it on the map.");
+export const updatePoint = rec => changePoints(() => savePoint(rec));
+export const removePoint = id => changePoints(() => deletePoint(id));
 
 // Download a new area around lat/lon (elevation, trails, then offline map tiles). progress(text) reports each step.
 export async function prepareHere(lat, lon, radiusKm, progress) {
@@ -141,7 +171,7 @@ export async function removeArea(name) {
   hooks.render();
 }
 
-// Save every area, its offline tiles and kept routes as one .trarea file (Files on iPhone, Downloads on the Mac).
+// Save every area, its offline tiles, kept routes and saved points as one .trarea file (Files on iPhone, Downloads on the Mac).
 export async function exportBackup(progress) {
   const areas = await listAreas(), cache = await caches.open(TILE_CACHE), tiles = new Map();
   for (const a of areas) {
@@ -152,13 +182,13 @@ export async function exportBackup(progress) {
     }
     progress(`Collecting ${tiles.size} map tiles…`);
   }
-  const blob = packBackup(areas, tiles, await listRoutes());
+  const blob = packBackup(areas, tiles, await listRoutes(), await listPoints());
   const name = `TerrainRoute-backup-${new Date().toISOString().slice(0, 10)}.trarea`;
   await shareFile(new File([blob], name, { type: "application/octet-stream" }), "TerrainRoute backup");
   return { areas: areas.length, tiles: tiles.size, mb: Math.round(blob.size / 1e5) / 10 };
 }
 
-// Restore a backup file: areas and kept routes are added (an area with the same name is replaced) and tiles cached.
+// Restore a backup file: areas, kept routes and saved points are added (an area with the same name is replaced) and tiles cached.
 export async function importBackup(file, progress) {
   const data = unpackBackup(await file.arrayBuffer());
   for (const a of data.areas) await saveArea(a);
@@ -168,9 +198,10 @@ export async function importBackup(file, progress) {
     if (++n % 100 === 0) progress(`Restoring map tiles… ${n}/${data.tiles.length}`);
   }
   for (const r of data.routes) await saveRoute(r);
+  for (const p of data.points) await savePoint(p);
   await reloadLists();
   if (!state.area && state.areas.length) await openArea(state.areas[0].name);
   drawAll();
   hooks.render();
-  return { areas: data.areas.length, tiles: data.tiles.length, routes: data.routes.length };
+  return { areas: data.areas.length, tiles: data.tiles.length, routes: data.routes.length, points: data.points.length };
 }

@@ -15,7 +15,7 @@ export const map = new maplibregl.Map({
 export const scale = new maplibregl.ScaleControl({ unit: "imperial" });
 map.addControl(scale, "bottom-left");
 export const mapReady = new Promise(res => map.on("load", res));
-const view = { bounds: null, markers: { origin: null, dest: null, hover: null, hardest: null, me: null, kept: [] } };
+const view = { bounds: null, markers: { origin: null, dest: null, hover: null, hardest: null, me: null, kept: [], points: [] } };
 
 const lineOf = latlon => ({ type: "LineString", coordinates: latlon.map(([la, lo]) => [lo, la]) });
 const ring = ([[s, w], [n, e]]) => ({ type: "LineString", coordinates: [[w, s], [e, s], [e, n], [w, n], [w, s]] });
@@ -54,7 +54,7 @@ function addLayers() {
   line("trails", "trails", { "line-color": "#8A5A33", "line-width": 2.4, "line-dasharray": [2.5, 1.8] });
   line("kept", "kept", { "line-color": ["get", "color"], "line-width": 4, "line-opacity": 0.9 });
   line("ghost", "ghost", { "line-color": "#6B6B6B", "line-width": 4, "line-dasharray": [1.2, 1.4] });
-  line("compare", "compare", { "line-color": ["get", "color"], "line-width": 3, "line-dasharray": [1.5, 1.5] });
+  line("compare", "compare", { "line-color": ["get", "color"], "line-width": 4, "line-opacity": 0.85, "line-dasharray": [1.5, 1.2] });
   line("hardest", "hardest", { "line-color": "#1C2127", "line-width": 16, "line-opacity": 0.22 });
   line("route-casing", "route", { "line-color": "#FFFFFF", "line-width": 10 });
   line("route", "route", { "line-color": ["case", ["get", "shade"], SHADE, "#0F5E54"], "line-width": 6 });
@@ -119,32 +119,43 @@ function marker(cls, text, opts = {}) {
   return new maplibregl.Marker({ element: el, ...opts });
 }
 
-// Start (A) and end (B) pins; draggable, calling onDrag(which, [lat, lon]) when dropped.
-export function drawPins(origin, dest, onDrag) {
-  for (const [which, ll, cls, text] of [["origin", origin, "pin a mk-pin", "A"], ["dest", dest, "pin b mk-pin", "B"]]) {
+// Start (A) and end (B) pins with their names beside them; draggable, calling onDrag(which, [lat, lon]) when dropped.
+export function drawPins(origin, dest, names, onDrag) {
+  for (const [k, which, ll, cls, letter] of [[0, "origin", origin, "a", "A"], [1, "dest", dest, "b", "B"]]) {
     view.markers[which]?.remove();
     view.markers[which] = null;
     if (!ll) continue;
-    const m = marker(cls, text, { draggable: true }).setLngLat([ll[1], ll[0]]).addTo(map);
+    const el = document.createElement("div");
+    el.className = "mk-pin";
+    el.innerHTML = `<span class="pin ${cls}">${letter}</span><span class="tag"></span>`;
+    el.querySelector(".tag").textContent = names[k];
+    const m = new maplibregl.Marker({ element: el, draggable: true, anchor: "left", offset: [-15, 0] }).setLngLat([ll[1], ll[0]]).addTo(map);
     m.on("dragend", () => { const p = m.getLngLat(); onDrag(which, [p.lat, p.lng]); });
     view.markers[which] = m;
   }
 }
 
-// The current answer: the best route (difficulty-shaded or plain), the grey previous route after an assumption
-// change, the comparison routes when asked for, trail join/leave points and the hardest 200 m stretch.
-export function drawResult(result, ghost, shadeOn) {
+// The current answer: the picked route (difficulty-shaded or plain), the other routes thin and dashed (clickable to
+// pick them), the grey previous route after an assumption change, trail join/leave points and the hardest 200 m.
+const COLORS = { hybrid: "#0F5E54", "off-trail only": "#6D28D9", "direct line": "#B3261E" };
+export function drawResult(result, ghost, shadeOn, selected) {
   if (!map.getSource("route")) return;
-  const best = result?.routes.find(r => r.label === "hybrid") || result?.routes.find(r => r.label === "off-trail only");
+  const best = result?.routes.find(r => r.label === selected) || null;
   const segs = best ? best.intensity.map((i, k) => feature(lineOf([best.latlon[k], best.latlon[k + 1]]), { i, shade: shadeOn })) : [];
   map.getSource("route").setData({ type: "FeatureCollection", features: segs });
   map.getSource("ghost").setData(ghost ? feature(lineOf(ghost.latlon)) : EMPTY);
   const others = (result?.routes || []).filter(r => r !== best);
-  const colors = { "off-trail only": "#6D28D9", "direct line": "#B3261E" };
-  map.getSource("compare").setData({ type: "FeatureCollection", features: others.map(r => feature(lineOf(r.latlon), { color: colors[r.label] })) });
+  map.getSource("compare").setData({ type: "FeatureCollection", features: others.map(r => feature(lineOf(r.latlon), { color: COLORS[r.label], label: r.label })) });
   const joins = best ? best.on_trail.flatMap((on, i) => (i > 0 && on !== best.on_trail[i - 1] ? [feature({ type: "Point", coordinates: [best.latlon[i][1], best.latlon[i][0]] })] : [])) : [];
   map.getSource("joins").setData({ type: "FeatureCollection", features: joins });
   drawHardest(best);
+}
+
+// Label of the route line under a map click (within a few pixels), or null.
+export function routeAt(point) {
+  if (!map.getLayer("compare") || map.getLayoutProperty("compare", "visibility") === "none") return null;
+  const box = [[point.x - 6, point.y - 6], [point.x + 6, point.y + 6]];
+  return map.queryRenderedFeatures(box, { layers: ["compare"] })[0]?.properties.label || null;
 }
 
 function drawHardest(best) {
@@ -172,6 +183,19 @@ export function drawKept(kept) {
   }
 }
 
+// Saved points as small labelled markers; tapping one offers Start here / End here via onPick(point, which).
+export function drawPoints(points, onPick) {
+  for (const m of view.markers.points) m.remove();
+  view.markers.points = points.map(p => {
+    const el = document.createElement("div");
+    el.className = "mk-point";
+    el.innerHTML = '<span class="dot"></span><span class="tag"></span>';
+    el.querySelector(".tag").textContent = p.name;
+    el.addEventListener("click", e => { e.stopPropagation(); pointPopup([p.lat, p.lon], which => onPick(p, which), { title: p.name }); });
+    return new maplibregl.Marker({ element: el, anchor: "left", offset: [-7, 0] }).setLngLat([p.lon, p.lat]).addTo(map);
+  });
+}
+
 // Marker following the elevation-profile cursor; null hides it.
 export function showHover(ll) {
   if (!ll) { view.markers.hover?.remove(); view.markers.hover = null; return; }
@@ -184,15 +208,23 @@ export function showMe(ll) {
   view.markers.me = ll ? marker("mk-me").setLngLat([ll[1], ll[0]]).addTo(map) : null;
 }
 
-// "Start here / End here" popup at a map point; onPick("origin" | "dest").
-export function pointPopup(ll, onPick) {
+// "Start here / End here" popup at a map point; onPick("origin" | "dest"). With `title` it is a saved point's popup;
+// with `onSave` it also offers "Save point", which asks for a name and calls onSave(name).
+export function pointPopup(ll, onPick, { title = "", onSave = null } = {}) {
   const el = document.createElement("div");
   el.className = "pop";
-  el.innerHTML = '<div class="where"></div><div class="btns"><button class="sa">Start here</button><button class="sb">End here</button></div>';
+  el.innerHTML = '<b class="title"></b><div class="where"></div><div class="btns"><button class="sa">Start here</button><button class="sb">End here</button></div>' +
+    '<button class="sp">Save point</button><form class="save" hidden><input maxlength="40" placeholder="Name, e.g. Camp" aria-label="Point name"><button>Save</button></form>';
+  el.querySelector(".title").textContent = title;
+  el.querySelector(".title").hidden = !title;
   el.querySelector(".where").textContent = `${ll[0].toFixed(5)}, ${ll[1].toFixed(5)}`;
+  el.querySelector(".sp").hidden = !onSave;
   const popup = new maplibregl.Popup({ closeButton: false, maxWidth: "260px" }).setLngLat([ll[1], ll[0]]).setDOMContent(el).addTo(map);
   el.querySelector(".sa").onclick = () => { popup.remove(); onPick("origin"); };
   el.querySelector(".sb").onclick = () => { popup.remove(); onPick("dest"); };
+  const form = el.querySelector(".save");
+  el.querySelector(".sp").onclick = () => { el.querySelector(".sp").hidden = true; form.hidden = false; form.querySelector("input").focus(); };
+  form.onsubmit = e => { e.preventDefault(); popup.remove(); onSave(form.querySelector("input").value); };
   return popup;
 }
 
