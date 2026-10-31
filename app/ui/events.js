@@ -3,7 +3,7 @@ import { parseLatLon } from "../engine/compute.js";
 import { renameArea } from "../store/areas.js";
 import { deleteRoute, listRoutes, saveRoute } from "../store/routes.js";
 import * as actions from "./actions.js";
-import { applySheet, render, renderAreaList, setTab, toast, updatePreview } from "./main.js";
+import { SHEET, applySheet, render, renderAreaList, setTab, toast, updatePreview } from "./main.js";
 import * as mapui from "./map.js";
 import { scrubProfile } from "./route-panel.js";
 import { pointName, set, setAssumption, setPoint, state } from "./state.js";
@@ -11,7 +11,6 @@ import { renderSettings } from "./lists.js";
 
 const $ = id => document.getElementById(id);
 const on = (id, ev, fn) => $(id).addEventListener(ev, fn);
-const SHEET_ORDER = ["peek", "half", "full"];
 
 function bindMap() {
   const m = mapui.map;
@@ -139,22 +138,34 @@ function bindSheet() {
   for (const b of document.querySelectorAll("[data-tab]")) b.onclick = () => setTab(b.dataset.tab);
   on("areaChip", "click", () => setTab("areas"));
   let drag = null;
-  on("grabber", "pointerdown", e => { drag = { y: e.clientY, h: $("panel").offsetHeight, moved: false }; $("grabber").setPointerCapture(e.pointerId); });
+  const root = document.documentElement;
+  on("grabber", "pointerdown", e => {
+    drag = { y: e.clientY, h: $("panel").offsetHeight, moved: false };
+    root.classList.add("dragging");
+    $("grabber").setPointerCapture(e.pointerId);
+  });
   on("grabber", "pointermove", e => {
     if (!drag) return;
     drag.moved ||= Math.abs(e.clientY - drag.y) > 6;
-    document.documentElement.style.setProperty("--sheet-h", `${Math.max(120, drag.h + drag.y - e.clientY)}px`);
+    root.style.setProperty("--sheet-h", `${Math.min(innerHeight - 100, Math.max(SHEET.nub(), drag.h + drag.y - e.clientY))}px`);
   });
-  on("grabber", "pointerup", e => {
+  const release = e => {
     if (!drag) return;
-    const h = drag.h + drag.y - e.clientY, pick = !drag.moved ? SHEET_ORDER[(SHEET_ORDER.indexOf(state.sheet) + 1) % 3]
-      : h < innerHeight * 0.35 ? "peek" : h < innerHeight * 0.7 ? "half" : "full";
+    root.classList.remove("dragging");
+    set({ sheet: drag.moved ? snapSheet(drag.h, drag.h + drag.y - e.clientY) : state.sheet === "full" || state.sheet === "nub" ? "peek" : state.sheet === "peek" ? "half" : "full" });
     drag = null;
-    if (state.tab !== "route") set({ tab: "route" });
-    set({ sheet: pick });
-    render();
     applySheet();
-  });
+  };
+  on("grabber", "pointerup", release);
+  on("grabber", "pointercancel", release);
+}
+
+// Where a dragged sheet settles: the nearest height in the direction it was pulled (one flick = one step), so a short
+// pull down from the peek view collapses it to the nub. from / to = heights in px at the start and end of the drag.
+function snapSheet(from, to) {
+  const all = Object.keys(SHEET).map(k => [k, SHEET[k]()]), dir = Math.sign(to - from);
+  const ahead = Math.abs(to - from) < 30 ? all : all.filter(([, h]) => (h - from) * dir > 10);
+  return (ahead.length ? ahead : all).reduce((best, c) => (Math.abs(c[1] - to) < Math.abs(best[1] - to) ? c : best))[0];
 }
 
 // Two-tap delete: the first tap arms the button for 4 s, the second deletes.

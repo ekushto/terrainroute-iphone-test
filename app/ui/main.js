@@ -12,7 +12,9 @@ import { setUnits } from "./units.js";
 
 const $ = id => document.getElementById(id);
 const wide = matchMedia("(min-width: 900px)");
-const SHEET = { peek: () => 236, half: () => Math.round(innerHeight * 0.5), full: () => innerHeight - 150 };
+// Phone sheet heights in px, smallest first. "nub" leaves only the handle (and hides the tab bar) to show the most map.
+export const SHEET = { nub: () => 26, peek: () => 236, half: () => Math.round(innerHeight * 0.5), full: () => innerHeight - 150 };
+const TAB_SHEET = { route: "peek", saved: "full", areas: "half", settings: "full" };
 const SIZE_NOTE = {
   4: "8 × 8 km · about 22 MB · about 6 s on Wi-Fi (measured on an iPhone)",
   2: "4 × 4 km · roughly a quarter of the full size (estimate)",
@@ -58,15 +60,16 @@ export async function renderAreaList() {
   renderAreas(counts);
 }
 
-// Phone sheet height: the Route tab peeks; Saved and Settings use the full height; Areas leaves room for the map.
+// Phone sheet height from state.sheet (opening a tab sets that tab's usual height; the handle changes it).
 export function applySheet() {
+  const root = document.documentElement;
+  root.classList.toggle("nub", !wide.matches && state.sheet === "nub");
   if (wide.matches) return;
-  const which = state.tab === "route" ? state.sheet : state.tab === "areas" ? "half" : "full";
-  document.documentElement.style.setProperty("--sheet-h", `${SHEET[which]()}px`);
+  root.style.setProperty("--sheet-h", `${SHEET[state.sheet]()}px`);
 }
 
 export function setTab(tab) {
-  set({ tab });
+  set({ tab, sheet: TAB_SHEET[tab] });
   if (tab === "areas") { renderAreaList(); updatePreview(); } else mapui.drawPreview(null);
   if (tab === "settings") renderSettings();
   render();

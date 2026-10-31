@@ -38,14 +38,15 @@ export async function openArea(name, fit = true) {
 
 export function drawAll() {
   mapui.applyLayers(state);
-  mapui.drawPins(state.origin, state.dest, [pointName("origin"), pointName("dest")], (which, ll) => placePoint(which, ll));
+  mapui.drawPins(state.origin, state.dest, [pointName("origin"), pointName("dest")], (which, ll) => placePoint(which, ll, state[`${which}Name`]));
   mapui.drawResult(state.result, state.ghost, state.shadeOn, shownRoute()?.label);
   mapui.drawKept(state.kept.filter(k => k.visible && k.area === state.area?.name));
   mapui.drawPoints(state.pointsOn ? state.points : [], (p, which) => placePoint(which, [p.lat, p.lon], p.name));
 }
 
-// Put the start or end pin at [lat, lon] (named `name` if given). A point in another area switches to that area.
-export async function placePoint(which, ll, name) {
+// Put the start or end pin at [lat, lon], named `name` (a new spot starts unnamed; dragging a pin keeps its name).
+// A point in another area switches to that area.
+export async function placePoint(which, ll, name = "") {
   const target = areaAt(ll);
   if (!target) {
     hooks.toast("That point is outside your downloaded areas. Download an area there first (Areas tab).");
@@ -53,7 +54,7 @@ export async function placePoint(which, ll, name) {
     return;
   }
   setPoint(which, ll);
-  if (name !== undefined) set({ [`${which}Name`]: name });
+  set({ [`${which}Name`]: name });
   if (target.name !== state.area?.name) return openArea(target.name, false);
   drawAll();
   hooks.render();

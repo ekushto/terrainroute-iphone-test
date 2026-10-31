@@ -185,7 +185,11 @@ svg.filled { stroke: none; }
   .wide-only, .brand .logo { display: none; }
   .panel { left: 0; right: 0; bottom: var(--tabbar); height: var(--sheet-h); border-radius: 16px 16px 0 0; box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12); transition: height 0.2s ease; }
   .brand { padding: 0 16px 4px; }
-  .grabber { border: 0; background: transparent; padding: 8px 0 6px; display: flex; justify-content: center; touch-action: none; }
+  .panel { overflow: hidden; }
+  .grabber { border: 0; background: transparent; padding: 10px 0 11px; display: flex; justify-content: center; touch-action: none; flex: none; }
+  :root.dragging .panel, :root.dragging .mapbtns.bottom { transition: none; }
+  :root.nub { --tabbar: env(safe-area-inset-bottom); }
+  :root.nub .tabs { display: none; }
   .grabber span { width: 36px; height: 5px; border-radius: 3px; background: #D0D4D9; }
   .tabs { position: fixed; left: 0; right: 0; bottom: 0; height: var(--tabbar); padding-bottom: env(safe-area-inset-bottom); border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); z-index: 5; }
   .tabs button { flex-direction: column; gap: 2px; font-size: 11px; }
@@ -194,7 +198,7 @@ svg.filled { stroke: none; }
   .mapbtns.top { top: calc(env(safe-area-inset-top) + 10px); right: 12px; }
   .mapbtns.bottom { right: 12px; bottom: calc(var(--tabbar) + var(--sheet-h) + 12px); transition: bottom 0.2s ease; }
   .layers { left: 0; right: 0; bottom: 0; top: 30vh; border-radius: 16px 16px 0 0; }
-  .maplibregl-ctrl-bottom-left { bottom: calc(var(--tabbar) + var(--sheet-h)); }
+  .maplibregl-ctrl-bottom-left, .maplibregl-ctrl-bottom-right { bottom: calc(var(--tabbar) + var(--sheet-h)); }
   .toast { top: calc(env(safe-area-inset-top) + 66px); }
 }
 .mk-point { display: flex; align-items: center; gap: 4px; cursor: pointer; }
