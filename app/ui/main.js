@@ -12,7 +12,7 @@ import { setUnits } from "./units.js";
 
 const $ = id => document.getElementById(id);
 const wide = matchMedia("(min-width: 900px)");
-// Phone sheet heights in px, smallest first. "nub" leaves only the handle (and hides the tab bar) to show the most map.
+// Phone sheet heights in px, smallest first. "nub" leaves only the handle above the tab bar, to show the most map.
 export const SHEET = { nub: () => 26, peek: () => 236, half: () => Math.round(innerHeight * 0.5), full: () => innerHeight - 150 };
 const TAB_SHEET = { route: "peek", saved: "full", areas: "half", settings: "full" };
 const SIZE_NOTE = {
@@ -62,10 +62,7 @@ export async function renderAreaList() {
 
 // Phone sheet height from state.sheet (opening a tab sets that tab's usual height; the handle changes it).
 export function applySheet() {
-  const root = document.documentElement;
-  root.classList.toggle("nub", !wide.matches && state.sheet === "nub");
-  if (wide.matches) return;
-  root.style.setProperty("--sheet-h", `${SHEET[state.sheet]()}px`);
+  if (!wide.matches) document.documentElement.style.setProperty("--sheet-h", `${SHEET[state.sheet]()}px`);
 }
 
 export function setTab(tab) {

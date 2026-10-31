@@ -188,8 +188,6 @@ svg.filled { stroke: none; }
   .panel { overflow: hidden; }
   .grabber { border: 0; background: transparent; padding: 10px 0 11px; display: flex; justify-content: center; touch-action: none; flex: none; }
   :root.dragging .panel, :root.dragging .mapbtns.bottom { transition: none; }
-  :root.nub { --tabbar: env(safe-area-inset-bottom); }
-  :root.nub .tabs { display: none; }
   .grabber span { width: 36px; height: 5px; border-radius: 3px; background: #D0D4D9; }
   .tabs { position: fixed; left: 0; right: 0; bottom: 0; height: var(--tabbar); padding-bottom: env(safe-area-inset-bottom); border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); z-index: 5; }
   .tabs button { flex-direction: column; gap: 2px; font-size: 11px; }
