@@ -29,15 +29,40 @@ function bindMap() {
     if (!(await mapui.set3D(state.threeD))) { set({ threeD: false }); render(); toast("3D could not be set up here; showing 2D. Zoom out and try again."); }
   });
   on("btnLocate", "click", () => locate(ll => { mapui.showMe(ll); m.flyTo({ center: [ll[1], ll[0]], zoom: Math.max(m.getZoom(), 14) }); }));
+  const goTo = ll => {
+    m.flyTo({ center: [ll[1], ll[0]], zoom: Math.max(m.getZoom(), 14) });
+    m.once("moveend", () => popupAt(ll));
+    $("searchInput").blur();
+  };
   on("search", "submit", e => {
     e.preventDefault();
     try {
-      const ll = parseLatLon($("searchInput").value);
-      m.flyTo({ center: [ll[1], ll[0]], zoom: Math.max(m.getZoom(), 14) });
-      m.once("moveend", () => popupAt(ll));
-      $("searchInput").blur();
+      goTo(parseLatLon($("searchInput").value));
     } catch (err) {
       toast(err.message);
+    }
+  });
+  pasteOnTap($("searchInput"), goTo);
+}
+
+// On a phone, tapping a "Paste lat, lon" box pastes the clipboard instead of raising the keyboard. If the clipboard
+// holds no coordinates (or can't be read), the box unlocks so a second tap types them by hand.
+function pasteOnTap(input, apply) {
+  if (!matchMedia("(pointer: coarse)").matches) return;
+  input.readOnly = true;
+  input.addEventListener("blur", () => { input.readOnly = true; });
+  input.addEventListener("click", async () => {
+    if (!input.readOnly) return;
+    input.blur();
+    let text = "";
+    try {
+      text = (await navigator.clipboard.readText()).trim();
+      const ll = parseLatLon(text);
+      input.value = `${ll[0]}, ${ll[1]}`;
+      apply(ll);
+    } catch {
+      input.readOnly = false;
+      toast(text ? "The clipboard doesn't hold 'lat, lon' coordinates. Tap the box again to type them." : "Nothing to paste. Copy coordinates first, or tap the box again to type them.");
     }
   });
 }
@@ -86,17 +111,17 @@ function bindRoute() {
     render();
   });
   for (const [id, which] of [["coordA", "origin"], ["coordB", "dest"]]) {
+    const place = ll => { showOnMap(ll); actions.placePoint(which, ll); };
     on(id, "change", () => {
       const text = $(id).value.trim();
       if (!text) return;
       try {
-        const ll = parseLatLon(text);
-        showOnMap(ll);
-        actions.placePoint(which, ll);
+        place(parseLatLon(text));
       } catch (err) {
         toast(err.message);
       }
     });
+    pasteOnTap($(id), place);
   }
   for (const [id, which] of [["saveA", "origin"], ["saveB", "dest"]]) {
     on(id, "click", () => (state[which] ? actions.addPoint(state[`${which}Name`], state[which]) : toast(`Set ${pointName(which).toLowerCase()} first, then save it.`)));

@@ -100,7 +100,7 @@ function registerOffline() {
 
 async function init() {
   loadSettings();
-  set({ tab: "route", sheet: "peek", layersOpen: false, threeD: false });
+  set({ tab: "route", sheet: "nub", layersOpen: false, threeD: false });
   actions.hooks.render = render;
   actions.hooks.toast = toast;
   bindEvents();

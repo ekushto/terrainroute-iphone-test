@@ -19,7 +19,7 @@
 <form id="search" class="floating search" autocomplete="off">
   <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
   <label class="sr" for="searchInput">Go to coordinates</label>
-  <input id="searchInput" placeholder="Paste lat, lon" inputmode="decimal" enterkeyhint="go">
+  <input id="searchInput" placeholder="Paste lat, lon" enterkeyhint="go">
 </form>
 
 <div class="mapbtns top">
@@ -84,8 +84,8 @@
         <button id="btnKeep" class="secondary">Keep</button>
       </div>
       <div class="points">
-        <div class="pt"><span class="pin a">A</span><div><input id="nameA" aria-label="Start name" placeholder="Start" maxlength="40"><input id="coordA" class="coord" aria-label="Start coordinates" placeholder="Paste lat, lon" inputmode="decimal" autocomplete="off"><select id="pickA" class="pick" aria-label="Start at a saved point"></select></div><button id="saveA" class="mini" aria-label="Save start as a point"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"></path></svg></button><button id="locA" class="mini" aria-label="Use my location as start"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l18-8-8 18-2-8z"></path></svg></button></div>
-        <div class="pt"><span class="pin b">B</span><div><input id="nameB" aria-label="End name" placeholder="End" maxlength="40"><input id="coordB" class="coord" aria-label="End coordinates" placeholder="Paste lat, lon" inputmode="decimal" autocomplete="off"><select id="pickB" class="pick" aria-label="End at a saved point"></select></div><button id="saveB" class="mini" aria-label="Save end as a point"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"></path></svg></button><button id="swap" class="mini" aria-label="Swap start and end"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M3 8l4-4 4 4M17 20V4M21 16l-4 4-4-4"></path></svg></button></div>
+        <div class="pt"><span class="pin a">A</span><div><input id="nameA" aria-label="Start name" placeholder="Start" maxlength="40"><input id="coordA" class="coord" aria-label="Start coordinates" placeholder="Paste lat, lon" autocomplete="off"><select id="pickA" class="pick" aria-label="Start at a saved point"></select></div><button id="saveA" class="mini" aria-label="Save start as a point"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"></path></svg></button><button id="locA" class="mini" aria-label="Use my location as start"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l18-8-8 18-2-8z"></path></svg></button></div>
+        <div class="pt"><span class="pin b">B</span><div><input id="nameB" aria-label="End name" placeholder="End" maxlength="40"><input id="coordB" class="coord" aria-label="End coordinates" placeholder="Paste lat, lon" autocomplete="off"><select id="pickB" class="pick" aria-label="End at a saved point"></select></div><button id="saveB" class="mini" aria-label="Save end as a point"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"></path></svg></button><button id="swap" class="mini" aria-label="Swap start and end"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v16M3 8l4-4 4 4M17 20V4M21 16l-4 4-4-4"></path></svg></button></div>
       </div>
       <div class="moderow">
         <div class="seg" role="group" aria-label="Mode"><button data-mode="normal">Normal</button><button data-mode="packout">Pack-out</button></div>
