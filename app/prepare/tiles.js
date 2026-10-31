@@ -1,11 +1,11 @@
-// Map tiles (port of terrainroute/tiles.py): z/x/y Web Mercator tile maths, the offline USGS Topo/Imagery downloads,
+// Map tiles (port of terrainroute/tiles.py): z/x/y Web Mercator tile maths, the offline USGS Topo/Hybrid downloads,
 // and Terrarium-encoded elevation tiles generated from our own DEM for MapLibre 3D.
 import { forward } from "../engine/utm.js";
 
 const USGS = "https://basemap.nationalmap.gov/arcgis/rest/services";
 export const BASEMAP_URLS = {
   topo: `${USGS}/USGSTopo/MapServer/tile/{z}/{y}/{x}`,
-  imagery: `${USGS}/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}`,
+  imagery: `${USGS}/USGSImageryTopo/MapServer/tile/{z}/{y}/{x}`,  // "Hybrid": the photo with contours, streams and names
 };
 export const BASEMAP_ZOOMS = [11, 12, 13, 14, 15, 16];  // USGS caches both to z16 (z17 returns 404)
 export const DEM_ZOOMS = [8, 9, 10, 11, 12, 13, 14];    // z14 is ~7 m/pixel at 40 deg N, finer than our 10 m DEM

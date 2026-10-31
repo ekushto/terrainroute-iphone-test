@@ -196,6 +196,7 @@ function bindLists() {
     if (!btn) return;
     const name = btn.dataset.id, act = btn.dataset.act;
     if (act === "open") await actions.openArea(name);
+    if (act === "tiles") return updateAreaTiles(btn, name);
     if (act === "rename") {
       return startRename(btn, state.areas.find(a => a.name === name)?.label || "", "Area name", async v => {
         await renameArea(name, v);
@@ -224,6 +225,22 @@ function bindLists() {
     }
     if (act === "del" && armed(btn)) actions.removePoint(p.id);
   });
+}
+
+// "Update map" on an area: download its missing tiles, reporting progress and the outcome under Areas.
+async function updateAreaTiles(btn, name) {
+  const msg = $("prepMsg");
+  btn.disabled = true;
+  msg.className = "msg";
+  try {
+    const failed = await actions.updateTiles(name, t => { msg.textContent = t; });
+    msg.className = "msg ok";
+    msg.textContent = failed ? `Map updated; ${failed} tiles failed. Try Update map again later.` : "Map updated and available offline.";
+  } catch (e) {
+    msg.className = "msg bad";
+    msg.textContent = `Map update failed: ${e.message}`;
+  }
+  renderAreaList();
 }
 
 // Swap a list item's buttons for a name box and Save; onSave(text) does the renaming.

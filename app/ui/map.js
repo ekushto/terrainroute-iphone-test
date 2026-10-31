@@ -1,9 +1,9 @@
 // The map (MapLibre 4.7.1, vendored): USGS base maps (offline from the tile cache inside downloaded areas, online
 // elsewhere when connected), 3D terrain from the current area's own elevation, overlays, pins and routes.
 import * as engine from "./engine.js";
+import { BASEMAP_URLS } from "../prepare/tiles.js";
 import { SHADE_STEPS } from "./shade.js";
 
-const USGS = "https://basemap.nationalmap.gov/arcgis/rest/services";
 const AWS_TERRAIN = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium";
 const EMPTY = { type: "FeatureCollection", features: [] };
 const SHADE = ["step", ["coalesce", ["get", "i"], 99], ...SHADE_STEPS.flatMap(([c, t], k) => (k ? [t, c] : [c]))];
@@ -38,10 +38,9 @@ maplibregl.addProtocol("trdem", async params => {
 });
 
 function addSources() {
-  const raster = layer => ({ type: "raster", tiles: [`${USGS}/${layer}/MapServer/tile/{z}/{y}/{x}`], tileSize: 256, maxzoom: 16,
-    attribution: "USGS The National Map" });
-  map.addSource("topo", raster("USGSTopo"));
-  map.addSource("imagery", raster("USGSImageryOnly"));
+  const raster = kind => ({ type: "raster", tiles: [BASEMAP_URLS[kind]], tileSize: 256, maxzoom: 16, attribution: "USGS The National Map" });
+  map.addSource("topo", raster("topo"));
+  map.addSource("imagery", raster("imagery"));
   map.addSource("dem", { type: "raster-dem", tiles: ["trdem://none/{z}/{x}/{y}"], encoding: "terrarium", tileSize: 256, minzoom: 8, maxzoom: 14 });
   for (const id of ["areas", "preview", "trails", "kept", "ghost", "compare", "route", "hardest", "joins"]) map.addSource(id, { type: "geojson", data: EMPTY });
 }
@@ -98,9 +97,8 @@ export async function drawPreview(outer, inner) {
 export function applyLayers(s) {
   if (!map.getLayer("route")) return;
   const vis = on => (on ? "visible" : "none");
-  map.setLayoutProperty("base-topo", "visibility", vis(s.base !== "imagery"));
-  map.setLayoutProperty("base-imagery", "visibility", vis(s.base !== "topo"));
-  map.setPaintProperty("base-imagery", "raster-opacity", s.base === "both" ? 0.45 : 1);
+  map.setLayoutProperty("base-topo", "visibility", vis(s.base === "topo"));
+  map.setLayoutProperty("base-imagery", "visibility", vis(s.base === "imagery"));
   if (map.getLayer("steep")) {
     map.setLayoutProperty("steep", "visibility", vis(s.steepOn));
     map.setPaintProperty("steep", "raster-opacity", s.steepOpacity);

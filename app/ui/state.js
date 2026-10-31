@@ -32,6 +32,7 @@ export function loadSettings() {
   try {
     const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
     for (const k of SAVED) if (k in saved) state[k] = saved[k];
+    if (state.base !== "topo") state.base = "imagery";  // "both" was retired; Hybrid replaces it
   } catch {
     // no storage (private mode) or bad JSON: keep defaults
   }

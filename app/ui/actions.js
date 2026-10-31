@@ -154,9 +154,18 @@ export async function prepareHere(lat, lon, radiusKm, progress) {
   if (await getArea(autoName(lat, lon))) throw new Error("You already have an area centred here. Move the map a little to make a new one.");
   const rec = await prepareAround(lat, lon, radiusKm, { onProgress: progress });
   await saveArea(rec);
-  const tiles = await downloadTiles(rec, { onProgress: (kind, d, n) => progress(`Saving ${kind === "topo" ? "Topo" : "Imagery"} map for offline use… ${d}/${n}`) });
+  const tiles = await downloadTiles(rec, { onProgress: (kind, d, n) => progress(`Saving ${kind === "topo" ? "Topo" : "Hybrid"} map for offline use… ${d}/${n}`) });
   await reloadLists();
   await openArea(rec.name);
+  return tiles.topo.failed + tiles.imagery.failed;
+}
+
+// Fetch an area's missing offline map tiles (evicted, failed, or a new map style). Returns how many still failed.
+export async function updateTiles(name, progress) {
+  const rec = state.areas.find(a => a.name === name);
+  const tiles = await downloadTiles(rec, { onProgress: (kind, d, n) => progress(`Saving ${kind === "topo" ? "Topo" : "Hybrid"} map for offline use… ${d}/${n}`) });
+  await reloadLists();
+  if (state.area?.name === name) set({ area: state.areas.find(a => a.name === name) });
   return tiles.topo.failed + tiles.imagery.failed;
 }
 
