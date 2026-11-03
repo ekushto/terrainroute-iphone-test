@@ -56,6 +56,12 @@ export function renderPoints() {
   }));
 }
 
+// " · Downloaded Nov 2, 2026" in local time, or "" when the area has no valid date (never a made-up one).
+const downloaded = iso => {
+  const d = iso ? new Date(iso) : null;
+  return d && !isNaN(d) ? ` · Downloaded ${d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : "";
+};
+
 export function renderAreas(tilesPresent) {
   const list = $("areaList");
   if (!state.areas.length) {
@@ -66,7 +72,7 @@ export function renderAreas(tilesPresent) {
     const tiles = areaTileUrls(a).length, have = tilesPresent[a.name] ?? 0, current = state.area?.name === a.name;
     const status = have === tiles ? "Available offline" : `Map tiles ${have}/${tiles} offline (routing works)`;
     const el = item(`<div class="top"><div><div class="name"></div><div class="sub ${have === tiles && tiles ? "ok" : ""}">${esc(status)}</div>
-      <div class="sub">${(a.cols * a.cell / 1000).toFixed(1)} × ${(a.rows * a.cell / 1000).toFixed(1)} km · ${a.trails.length} trails</div></div></div>
+      <div class="sub">${(a.cols * a.cell / 1000).toFixed(1)} × ${(a.rows * a.cell / 1000).toFixed(1)} km · ${a.trails.length} trails${esc(downloaded(a.createdAt))}</div></div></div>
       <div class="btns"><button data-act="open" data-id="${esc(a.name)}" class="${current ? "on" : ""}">${current ? "Current" : "Show"}</button>
       ${have < tiles ? `<button data-act="tiles" data-id="${esc(a.name)}">Update map</button>` : ""}
       <button data-act="rename" data-id="${esc(a.name)}">Rename</button><button data-act="del" data-id="${esc(a.name)}" class="danger">Delete</button></div>`);
