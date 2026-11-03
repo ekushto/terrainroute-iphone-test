@@ -301,6 +301,8 @@ function bindAreas() {
     toast(ok ? "The browser agreed to keep your data." : persistAdvice());
     renderSettings();
   });
+  on("btnWelcome", "click", () => { set({ welcomeOpen: true }); render(); });
+  on("btnWelcomeDone", "click", () => { set({ welcomeOpen: false, welcomed: true }); render(); });
 }
 
 function bindBackup() {

@@ -51,6 +51,7 @@ export function render() {
   $("layers").hidden = !state.layersOpen;
   $("btnLayers").setAttribute("aria-expanded", String(state.layersOpen));
   $("btn3d").setAttribute("aria-pressed", String(state.threeD));
+  $("welcome").hidden = !state.welcomeOpen;
   applySheet();
 }
 
@@ -98,6 +99,17 @@ function registerOffline() {
   navigator.serviceWorker.ready.then(reg => reg.active?.postMessage("build"));
 }
 
+// The launch screen is in the page markup; lift it once the map has drawn, shown at least 0.6 s and at most 3 s (the
+// cap matters offline, where the map may never report loaded). The welcome card follows on a device's first open.
+async function liftSplash() {
+  const minimum = new Promise(res => setTimeout(res, 600));
+  const cap = new Promise(res => setTimeout(res, 3000));
+  await Promise.race([Promise.all([minimum, mapui.mapReady]), cap]);
+  $("splash").classList.add("gone");
+  setTimeout(() => $("splash").remove(), 400);
+  if (!state.welcomed) { set({ welcomeOpen: true }); render(); }
+}
+
 async function init() {
   loadSettings();
   set({ tab: "route", sheet: "nub", layersOpen: false, threeD: false });
@@ -106,6 +118,7 @@ async function init() {
   bindEvents();
   registerOffline();
   render();
+  liftSplash();
   try {
     await actions.reloadLists();
     const start = state.areas.find(a => a.name === state.areaName) || state.areas[0];

@@ -1,7 +1,7 @@
 // Offline support. The app's own files are cached at install (cache-first, replaced as a whole when BUILD changes);
 // USGS map tiles saved with an area are answered from the tile cache, so the map works with no signal. Everything
 // else goes to the network as usual. BUILD is a hash of the app files, written by `npm run stamp` (a test checks it).
-const BUILD = "63b7a0cd161f";
+const BUILD = "56979443766c";
 const APP_CACHE = `tr-app-${BUILD}`, TILE_CACHE = "tr-tiles-v1", TILE_HOST = "basemap.nationalmap.gov";
 const APP_FILES = [
   "./", "index.html", "app.css", "manifest.webmanifest", "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png",

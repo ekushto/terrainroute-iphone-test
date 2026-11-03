@@ -11,9 +11,9 @@
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="stylesheet" href="vendor/maplibre/maplibre-gl.css">
 <link rel="stylesheet" href="app.css">
-<script src="vendor/maplibre/maplibre-gl.js"></script>
 </head>
 <body>
+<div id="splash" class="splash" aria-hidden="true"><img src="icons/icon-512.png" alt=""><span>TerrainRoute</span></div>
 <div id="map" aria-label="Map"></div>
 
 <form id="search" class="floating search" autocomplete="off">
@@ -146,11 +146,30 @@
     <p id="storageFacts" class="hint"></p>
     <button id="btnPersist" class="secondary">Ask to keep my data</button>
     <p class="hint">Areas, kept routes and settings live only in this browser on this device. Nothing is uploaded. Clearing website data deletes them: use Back up areas.</p>
+    <div class="label">Help</div>
+    <button id="btnWelcome" class="secondary">How it works</button>
     <p id="version" class="hint"></p>
   </section>
 </aside>
 
+<div id="welcome" class="welcome" hidden>
+  <div class="welcomecard" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
+    <img src="icons/icon-192.png" alt="">
+    <h2 id="welcomeTitle">TerrainRoute</h2>
+    <p>Finds the lowest-effort way between two points, mixing trails with off-trail ground, using slope and terrain. Works offline.</p>
+    <ul>
+      <li><b>Areas:</b> download a patch of map and terrain before you go. Needs signal.</li>
+      <li><b>Route:</b> set A and B by tapping the map, pasting coordinates, or using your location.</li>
+      <li><b>Saved:</b> keep routes and points, and export a GPX file for other mapping apps (onX, Gaia, etc.).</li>
+      <li><b>Settings:</b> units, mode (packout = safer loaded descents), backups.</li>
+    </ul>
+    <button id="btnWelcomeDone" class="primary">Get started</button>
+  </div>
+</div>
+
 <div id="toast" class="toast" role="alert" hidden></div>
+<!-- MapLibre loads after the markup so the launch screen paints first -->
+<script src="vendor/maplibre/maplibre-gl.js"></script>
 <script type="module" src="ui/main.js"></script>
 </body>
 </html>

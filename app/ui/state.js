@@ -3,7 +3,7 @@
 
 const SETTINGS_KEY = "terrainroute.settings.v1";
 const SAVED = ["units", "mode", "friction", "base", "steepOn", "steepOpacity", "trailsOn", "shadeOn", "keptOn", "prepRadius",
-  "areaName", "compareOn", "pointsOn"];
+  "areaName", "compareOn", "pointsOn", "welcomed"];
 
 // Off-trail difficulty = how many times the effort of the same metre on a maintained trail (slope penalties stack).
 // ASSUMPTIONS to calibrate in the field.
@@ -26,6 +26,7 @@ export const state = {
   origin: null, dest: null, originName: "", destName: "",   // [lat, lon] pins
   result: null, ghost: null, busy: false, seq: 0, compareOn: true, selected: "hybrid",
   kept: [], points: [], tab: "route", sheet: "peek", threeD: false, layersOpen: false,
+  welcomed: false, welcomeOpen: false,  // first-run welcome card seen on this device; showing now
 };
 
 export function loadSettings() {
